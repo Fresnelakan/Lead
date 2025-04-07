@@ -1,34 +1,29 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'onboarding.dart';
-import 'home_page.dart';
+//import 'package:firebase_core/firebase_core.dart';
+//import 'firebase_options.dart';
+import 'wrapper.dart';
 
-void main() {
-  runApp(const MainApp());
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  //await Firebase.initializeApp(
+    //options: DefaultFirebaseOptions.currentPlatform,
+  //);
+
+  runApp(const MyApp());
 }
 
-class MainApp extends StatelessWidget {
-  const MainApp({super.key});
-
-  Future<bool> checkIfSeen() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getBool('onboarding_seen') ?? false;
-  }
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      home: FutureBuilder<bool>(
-        future: checkIfSeen(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          } else {
-            final seen = snapshot.data ?? false;
-            return seen ? const HomePage() : const OnboardingScreen();
-          }
-        },
+      debugShowCheckedModeBanner: false,
+      title: 'Mon App',
+      theme: ThemeData(
+        primarySwatch: Colors.blue,
       ),
+      home: const Wrapper(),
     );
   }
 }
