@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+
 <html>
 <head>
   <!--
@@ -32,7 +33,21 @@
   <title>lead</title>
   <link rel="manifest" href="manifest.json">
 </head>
+
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+<script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyA7XRK0FPlz_7jyUHqj2xY8Ue_SMf9xHOg",
+    authDomain: "lead-10402.firebaseapp.com",
+    projectId: "lead-10402",
+    storageBucket: "lead-10402.appspot.com",  // Note: ".appspot.com" est le format correct
+    messagingSenderId: "796388366674",
+    appId: "1:796388366674:web:52c951a35d491d3ba8828b"
+  };
+  firebase.initializeApp(firebaseConfig);
+  </script>
 <body>
-  <script src="flutter_bootstrap.js" async></script>
+<script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

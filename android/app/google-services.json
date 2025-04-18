@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "796388366674",
+    "project_id": "lead-10402",
+    "storage_bucket": "lead-10402.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:796388366674:android:2c0ca28370722f36a8828b",
+        "android_client_info": {
+          "package_name": "com.example.lead"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDoo6UBnNnyfbO69aPSl7s9M3ABq3DvcZk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
