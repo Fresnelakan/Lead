@@ -10,18 +10,35 @@ class AuthScreen extends StatefulWidget {
 }
 
 class _AuthScreenState extends State<AuthScreen> {
-  bool showLogin = true;
+  bool _showLoginPage = true;
 
-  void toggleView() {
+  void _toggleAuthView() {
     setState(() {
-      showLogin = !showLogin;
+      _showLoginPage = !_showLoginPage;
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    return showLogin
-        ? LoginPage(onToggle: toggleView)
-        : RegisterPage(onToggle: toggleView);
+    return Scaffold(
+      body: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 300),
+        child: _showLoginPage
+            ? LoginPage(
+                key: const ValueKey('LoginPage'),
+                onToggleAuthMode: _toggleAuthView,
+              )
+            : RegisterPage(
+                key: const ValueKey('RegisterPage'),
+                onToggle: _toggleAuthView,
+              ),
+        transitionBuilder: (child, animation) {
+          return FadeTransition(
+            opacity: animation,
+            child: child,
+          );
+        },
+      ),
+    );
   }
 }

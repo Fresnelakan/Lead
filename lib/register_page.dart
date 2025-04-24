@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../services/google_auth_service.dart';
 
 class RegisterPage extends StatefulWidget {
   final VoidCallback onToggle;
@@ -18,6 +19,9 @@ class _RegisterPageState extends State<RegisterPage> {
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
   final confirmPasswordController = TextEditingController();
+   final GoogleAuthService _googleAuth = GoogleAuthService();
+  bool _isGoogleLoading = false;
+
 
   @override
   void dispose() {
@@ -27,6 +31,43 @@ class _RegisterPageState extends State<RegisterPage> {
     confirmPasswordController.dispose();
     super.dispose();
   }
+
+  Future<void> _signUpWithGoogle() async {
+    try {
+      setState(() => _isGoogleLoading = true);
+      final userCredential = await _googleAuth.signInWithGoogle();
+      
+      if (userCredential != null && mounted) {
+        // Enregistrer les infos supplémentaires dans Firestore
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(userCredential.user!.uid)
+            .set({
+          'name': userCredential.user!.displayName ?? 'Utilisateur Google',
+          'email': userCredential.user!.email,
+          'createdAt': Timestamp.now(),
+        });
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Inscription Google réussie !')),
+          );
+          widget.onToggle(); // Rediriger vers la page de connexion
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur lors de l\'inscription avec Google: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isGoogleLoading = false);
+      }
+    }
+  }
+
 
   Future<void> registerUser() async {
     if (_formKey.currentState!.validate()) {
@@ -255,10 +296,12 @@ class _RegisterPageState extends State<RegisterPage> {
                       ),
                       side: const BorderSide(color: Colors.grey),
                     ),
-                    onPressed: () {
+                    
                       // Fonction de Google sign-in à implémenter
-                    },
-                    child: Row(
+                      onPressed: _isGoogleLoading ? null : _signUpWithGoogle,
+                    child: _isGoogleLoading
+                        ? const CircularProgressIndicator()
+                        : Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         SvgPicture.asset(
