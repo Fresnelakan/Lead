@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart'; // Pour l'icône Google
+import "home_page.dart";
 
 class LoginPage extends StatelessWidget {
   final VoidCallback onToggle;
@@ -16,20 +17,19 @@ class LoginPage extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Text(
-                "Bienvenue !",
-                style: TextStyle(
-                  fontSize: 32,
-                  fontWeight: FontWeight.bold,
+              const Align(
+                alignment: Alignment.center,
+                child: Text(
+                  "Heureux de vous revoir !",
+                  textAlign: TextAlign.center, // Assurez-vous que le texte est bien centré
+                  style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
                 ),
               ),
+
               const SizedBox(height: 8),
               const Text(
                 "Connectez-vous pour continuer",
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Colors.grey,
-                ),
+                style: TextStyle(fontSize: 16, color: Colors.grey),
               ),
               const SizedBox(height: 32),
 
@@ -73,7 +73,6 @@ class LoginPage extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 24),
-                    
 
                     // Bouton connexion
                     SizedBox(
@@ -84,14 +83,21 @@ class LoginPage extends StatelessWidget {
                           backgroundColor: Colors.black,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
+                          ),
                         ),
-                        ),
+                        //***************************************************** */
                         onPressed: () {
-                          // logique de connexion
+                          Navigator.pushReplacement(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const HomePage(),
+                            ),
+                          );
                         },
+                        //***************************************************** */
                         child: const Text(
                           "Se connecter",
-                          style: TextStyle(fontSize: 16),
+                          style: TextStyle(fontSize: 16, color: Color.fromARGB(225, 255, 255, 255)),
                         ),
                       ),
                     ),
@@ -140,10 +146,7 @@ class LoginPage extends StatelessWidget {
                       const SizedBox(width: 8),
                       const Text(
                         "Se connecter avec Google",
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: Colors.black87,
-                        ),
+                        style: TextStyle(fontSize: 16, color: Colors.black87),
                       ),
                     ],
                   ),

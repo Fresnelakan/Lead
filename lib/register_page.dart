@@ -103,7 +103,7 @@ class RegisterPage extends StatelessWidget {
                         },
                         child: const Text(
                           "Créer un compte",
-                          style: TextStyle(fontSize: 16),
+                          style: TextStyle(fontSize: 16, color: Color.fromARGB(225, 255, 255, 255)),
                         ),
                       ),
                     ),
