@@ -11,6 +11,7 @@ class GoogleAuthService {
     GoogleSignIn? googleSignIn,
   })  : _auth = auth ?? FirebaseAuth.instance,
         _googleSignIn = googleSignIn ?? GoogleSignIn(
+          clientId: '796388366674-o0rp4jmlq61lja3bl7r8j95hi1qod4c0.apps.googleusercontent.com',
           scopes: ['email', 'profile'],
           // Optionnel : Forcer le compte sélectionné (pour les apps d'entreprise)
           // hostedDomain: 'votredomaine.com',
