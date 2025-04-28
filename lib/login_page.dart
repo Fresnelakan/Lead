@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../services/google_auth_service.dart';
+import 'home_page.dart'; // Assurez-vous d'importer HomePage
 
 class LoginPage extends StatefulWidget {
   final VoidCallback onToggleAuthMode;
@@ -39,8 +40,12 @@ class _LoginPageState extends State<LoginPage> {
         password: _passwordController.text,
       );
       
+      // Redirection vers HomePage après connexion réussie
       if (mounted) {
-        Navigator.pushReplacementNamed(context, '/home');
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => HomePage()),
+        );
       }
     } on FirebaseAuthException catch (e) {
       _showErrorSnackbar(_getErrorMessage(e));
@@ -55,10 +60,16 @@ class _LoginPageState extends State<LoginPage> {
     try {
       final userCredential = await _googleAuth.signInWithGoogle();
       if (userCredential != null && mounted) {
-        Navigator.pushReplacementNamed(context, '/home');
+        // Redirection vers HomePage après connexion Google réussie
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => HomePage()),
+        );
       }
+    } on FirebaseAuthException catch (e) {
+      _showErrorSnackbar('Erreur Google: ${_getErrorMessage(e)}');
     } catch (e) {
-      _showErrorSnackbar('Erreur lors de la connexion avec Google: $e');
+      _showErrorSnackbar('Erreur inattendue: ${e.toString()}');
     } finally {
       if (mounted) setState(() => _isGoogleLoading = false);
     }
@@ -72,16 +83,20 @@ class _LoginPageState extends State<LoginPage> {
         return 'Mot de passe incorrect';
       case 'invalid-email':
         return 'Format d\'email invalide';
+      case 'account-exists-with-different-credential':
+        return 'Un compte existe déjà avec ces identifiants';
       default:
         return 'Erreur de connexion: ${e.message}';
     }
   }
 
   void _showErrorSnackbar(String message) {
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
         backgroundColor: Colors.red,
+        duration: const Duration(seconds: 3),
       ),
     );
   }
@@ -123,9 +138,9 @@ class _LoginPageState extends State<LoginPage> {
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black12,
+                        color: Colors.black.withOpacity(0.1),
                         blurRadius: 12,
-                        offset: Offset(0, 6),
+                        offset: const Offset(0, 6),
                       ),
                     ],
                   ),
@@ -190,10 +205,13 @@ class _LoginPageState extends State<LoginPage> {
                           ),
                           onPressed: _isLoading ? null : _handleEmailLogin,
                           child: _isLoading
-                              ? const CircularProgressIndicator()
+                              ? const CircularProgressIndicator(color: Colors.white)
                               : const Text(
                                   "Se connecter",
-                                  style: TextStyle(fontSize: 16),
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    color: Colors.white,
+                                  ),
                                 ),
                         ),
                       ),
@@ -265,5 +283,6 @@ class _LoginPageState extends State<LoginPage> {
         ),
       ),
     );
+ 
   }
 }

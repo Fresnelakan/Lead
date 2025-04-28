@@ -2,49 +2,62 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
 class GoogleAuthService {
+  // ID client Android uniquement (le web utilise le meta-tag HTML)
+  static const String _androidClientId = '796388366674-o0rp4jmlq61lja3bl7r8j95hi1qod4c0.apps.googleusercontent.com';
+
   final FirebaseAuth _auth;
   final GoogleSignIn _googleSignIn;
+  final bool _isWeb;
 
-  // Constructeur avec initialisation optionnelle pour les tests
-  GoogleAuthService({
+  // Constructeur privé
+  GoogleAuthService._internal({
+    required FirebaseAuth auth,
+    required GoogleSignIn googleSignIn,
+    required bool isWeb,
+  })  : _auth = auth,
+        _googleSignIn = googleSignIn,
+        _isWeb = isWeb;
+
+  // Factory constructor
+  factory GoogleAuthService({
     FirebaseAuth? auth,
     GoogleSignIn? googleSignIn,
-  })  : _auth = auth ?? FirebaseAuth.instance,
-        _googleSignIn = googleSignIn ?? GoogleSignIn(
-          clientId: '796388366674-o0rp4jmlq61lja3bl7r8j95hi1qod4c0.apps.googleusercontent.com',
-          scopes: ['email', 'profile'],
-          // Optionnel : Forcer le compte sélectionné (pour les apps d'entreprise)
-          // hostedDomain: 'votredomaine.com',
-        );
+    bool? isWeb,
+  }) {
+    final isWebPlatform = !(identical(0, 0.0)); // Détection fiable
+    final resolvedIsWeb = isWeb ?? isWebPlatform;
+
+    return GoogleAuthService._internal(
+      auth: auth ?? FirebaseAuth.instance,
+      googleSignIn: googleSignIn ?? GoogleSignIn(
+        clientId: resolvedIsWeb ? null : _androidClientId, // null pour web
+        scopes: ['email', 'profile'],
+      ),
+      isWeb: resolvedIsWeb,
+    );
+  }
 
   Future<UserCredential?> signInWithGoogle() async {
     try {
-      // 1. Démarrer le processus de connexion
+      print('Plateforme: ${_isWeb ? "WEB" : "MOBILE"}');
+
       final googleUser = await _googleSignIn.signIn();
       if (googleUser == null) return null;
 
-      // 2. Obtenir les tokens d'authentification
       final googleAuth = await googleUser.authentication;
-
-      // 3. Vérifier la présence des tokens critiques
-      if (googleAuth.accessToken == null || googleAuth.idToken == null) {
+      if (googleAuth.idToken == null) {
         throw FirebaseAuthException(
-          code: 'missing-tokens',
-          message: 'Les tokens Google sont manquants',
+          code: 'missing-id-token',
+          message: 'ID Token manquant',
         );
       }
 
-      // 4. Créer les credentials Firebase
       final credential = GoogleAuthProvider.credential(
         accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
       );
 
-      // 5. Connexion à Firebase avec vérification de contexte
-      if (_auth.currentUser != null) {
-        await _auth.signOut(); // Éviter les conflits de session
-      }
-
+      await _auth.signOut(); // Nettoyage de session
       return await _auth.signInWithCredential(credential);
 
     } on FirebaseAuthException catch (e) {
