@@ -76,32 +76,114 @@ class _TimetableSetupScreenState extends State<TimetableSetupScreen> {
   ];
   int _currentDayIndex = 0;
   final List<List<TimeSlot>> _timeSlots = List.generate(7, (_) => []);
+  final Set<int> _errorIndexes = {};
 
   void _addTimeSlot() {
+  final slots = _timeSlots[_currentDayIndex];
+  // 1. Vérifier que la tâche précédente est remplie
+    if (slots.isNotEmpty && slots.last.activity.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Veuillez remplir la tâche précédente avant d\'en ajouter une nouvelle.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      _setErrorIndexes({slots.length - 1});
+      return;
+    }
+
+  // 2. Vérifier que l'heure de fin > heure de début
+    if (slots.isNotEmpty &&
+        !_isEndAfterStart(slots.last.startTime, slots.last.endTime)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('L\'heure de fin doit être après l\'heure de début.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      _setErrorIndexes({slots.length - 1});
+      return;
+    }
+
+  // 2. Heure de début = heure de fin précédente, sinon heure actuelle
+  TimeOfDay start = TimeOfDay.now();
+  if (slots.isNotEmpty) {
+    start = slots.last.endTime;
+  }
+  setState(() {
+    slots.add(TimeSlot()
+      ..startTime = start
+      ..endTime = start
+    );
+    _errorIndexes.clear();
+  });
+}
+
+   // Vérifie si end > start
+  bool _isEndAfterStart(TimeOfDay start, TimeOfDay end) {
+    final startMinutes = start.hour * 60 + start.minute;
+    final endMinutes = end.hour * 60 + end.minute;
+    return endMinutes > startMinutes;
+  }
+
+  // Vérifie s'il y a chevauchement dans la liste des créneaux
+  Set<int> _findOverlappingSlots(List<TimeSlot> slots) {
+    Set<int> overlapping = {};
+    for (int i = 0; i < slots.length; i++) {
+      final aStart = slots[i].startTime.hour * 60 + slots[i].startTime.minute;
+      final aEnd = slots[i].endTime.hour * 60 + slots[i].endTime.minute;
+      for (int j = i + 1; j < slots.length; j++) {
+        final bStart = slots[j].startTime.hour * 60 + slots[j].startTime.minute;
+        final bEnd = slots[j].endTime.hour * 60 + slots[j].endTime.minute;
+        // Chevauchement si l'un commence avant la fin de l'autre et finit après le début de l'autre
+        if (aStart < bEnd && aEnd > bStart) {
+          overlapping.add(i);
+          overlapping.add(j);
+        }
+      }
+    }
+    return overlapping;
+  }
+
+  // Pour gérer l'affichage des erreurs (clignotement)
+  void _setErrorIndexes(Set<int> indexes) {
     setState(() {
-      _timeSlots[_currentDayIndex].add(TimeSlot());
+      _errorIndexes.clear();
+      _errorIndexes.addAll(indexes);
+    });
+    // Animation simple : retire l'erreur après 1 seconde si corrigé
+    Future.delayed(const Duration(seconds: 1), () {
+      if (mounted) setState(() => _errorIndexes.clear());
     });
   }
 
+
   void _nextDay() async {
-    // Marquez la fonction comme async
+    final slots = _timeSlots[_currentDayIndex];
+    // Vérifier qu'il n'y a pas de chevauchement
+    final overlapping = _findOverlappingSlots(slots);
+    if (overlapping.isNotEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Il y a des chevauchements entre vos tâches.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      _setErrorIndexes(overlapping);
+      return;
+    }
+
     if (_currentDayIndex < _days.length - 1) {
       setState(() => _currentDayIndex++);
     } else {
-      // L'utilisateur a terminé la saisie de tous les jours
-
-      // 1. Convertir les données de l'emploi du temps en JSON
+      // ...existing code pour envoyer à Firestore et naviguer...
       final String jsonTimetable = _buildJsonTimetable();
-
-      // 2. Envoyer le JSON à Firebase Firestore
       await _sendTimetableToFirestore(jsonTimetable);
-
-      // 3. Naviguer vers la page de l'emploi du temps optimisé
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
           builder: (_) => const OptimizedSchedulePage(),
-        ), // Naviguer vers la nouvelle page
+        ),
       );
     }
   }
@@ -197,21 +279,43 @@ class _TimetableSetupScreenState extends State<TimetableSetupScreen> {
                 itemBuilder:
                     (context, index) => TimeSlotEntry(
                       timeSlot: _timeSlots[_currentDayIndex][index],
+                      error: _errorIndexes.contains(index),
                     ),
               ),
             ),
-            ElevatedButton(
-              onPressed: _addTimeSlot,
-              child: const Text("+ Ajouter une plage horaire"),
-            ),
-            ElevatedButton(
-              onPressed: _nextDay,
-              child: Text(
-                _currentDayIndex == _days.length - 1
-                    ? "Terminer"
-                    : "Jour suivant",
-              ),
-            ),
+            Row(
+  children: [
+    Expanded(
+      child: ElevatedButton.icon(
+        icon: const Icon(Icons.add),
+        label: const Text("Ajouter une tâche"),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.black,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+        onPressed: _addTimeSlot,
+      ),
+    ),
+    const SizedBox(width: 16),
+    Expanded(
+      child: ElevatedButton.icon(
+        icon: const Icon(Icons.arrow_forward),
+        label: Text(
+          _currentDayIndex == _days.length - 1 ? "Terminer" : "Jour suivant",
+        ),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.blue,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+        onPressed: _nextDay,
+      ),
+    ),
+  ],
+),
           ],
         ),
       ),
@@ -227,59 +331,113 @@ class TimeSlot {
 
 class TimeSlotEntry extends StatefulWidget {
   final TimeSlot timeSlot;
+  final bool error;
 
-  const TimeSlotEntry({super.key, required this.timeSlot});
+  const TimeSlotEntry({super.key, required this.timeSlot, this.error = false});
 
   @override
   State<TimeSlotEntry> createState() => _TimeSlotEntryState();
 }
 
-class _TimeSlotEntryState extends State<TimeSlotEntry> {
+class _TimeSlotEntryState extends State<TimeSlotEntry>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<Color?> _colorAnimation;
+
+  @override
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 400),
+      vsync: this,
+    );
+    _colorAnimation = ColorTween(
+      begin: Colors.white,
+      end: Colors.red[100],
+    ).animate(_controller);
+
+    if (widget.error) {
+      _controller.repeat(reverse: true);
+    }
+  }
+
+  @override
+  void didUpdateWidget(TimeSlotEntry oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.error && !_controller.isAnimating) {
+      _controller.repeat(reverse: true);
+    } else if (!widget.error && _controller.isAnimating) {
+      _controller.reset();
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(8.0),
-        child: Column(
-          children: [
-            Row(
+    return AnimatedBuilder(
+      animation: _colorAnimation,
+      builder: (context, child) {
+        return Card(
+          color: widget.error ? _colorAnimation.value : Colors.white,
+          shape: RoundedRectangleBorder(
+            side: widget.error
+                ? const BorderSide(color: Colors.red, width: 2)
+                : BorderSide.none,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Column(
               children: [
-                const Text("De :"),
-                TextButton(
-                  child: Text(widget.timeSlot.startTime.format(context)),
-                  onPressed: () async {
-                    final time = await showTimePicker(
-                      context: context,
-                      initialTime: widget.timeSlot.startTime,
-                    );
-                    if (time != null)
-                      setState(() => widget.timeSlot.startTime = time);
-                  },
+                Row(
+                  children: [
+                    const Text("De :"),
+                    TextButton(
+                      child: Text(widget.timeSlot.startTime.format(context)),
+                      onPressed: () async {
+                        final time = await showTimePicker(
+                          context: context,
+                          initialTime: widget.timeSlot.startTime,
+                        );
+                        if (time != null) {
+                          setState(() => widget.timeSlot.startTime = time);
+                        }
+                      },
+                    ),
+                    const Text("À :"),
+                    TextButton(
+                      child: Text(widget.timeSlot.endTime.format(context)),
+                      onPressed: () async {
+                        final time = await showTimePicker(
+                          context: context,
+                          initialTime: widget.timeSlot.endTime,
+                        );
+                        if (time != null) {
+                          setState(() => widget.timeSlot.endTime = time);
+                        }
+                      },
+                    ),
+                  ],
                 ),
-                const Text("À :"),
-                TextButton(
-                  child: Text(widget.timeSlot.endTime.format(context)),
-                  onPressed: () async {
-                    final time = await showTimePicker(
-                      context: context,
-                      initialTime: widget.timeSlot.endTime,
-                    );
-                    if (time != null)
-                      setState(() => widget.timeSlot.endTime = time);
-                  },
+                TextField(
+                  decoration: const InputDecoration(labelText: "Activité"),
+                  onChanged: (value) => widget.timeSlot.activity = value,
                 ),
               ],
             ),
-            TextField(
-              decoration: const InputDecoration(labelText: "Activité"),
-              onChanged: (value) => widget.timeSlot.activity = value,
-            ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 }
+
 
 class TimetableViewScreen extends StatelessWidget {
   const TimetableViewScreen({super.key});
