@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../services/google_auth_service.dart';
+import 'forgot_password_page.dart';
 import 'home_page.dart'; // Assurez-vous d'importer HomePage
 
 class LoginPage extends StatefulWidget {
@@ -232,6 +233,21 @@ class _LoginPageState extends State<LoginPage> {
                   ],
                 ),
                 const SizedBox(height: 16),
+                
+               const SizedBox(height: 8),
+                                      TextButton(
+                                        onPressed: () {
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(builder: (context) => ForgotPasswordPage()),
+                                          );
+                                        },
+                                        child: const Text(
+                                          "Mot de passe oublié ?",
+                                          style: TextStyle(color: Colors.blue),
+                                        ),
+                                      ),
+            const SizedBox(height: 8),
 
                 // Bouton Google
                 SizedBox(
