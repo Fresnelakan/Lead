@@ -1,0 +1,15 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /users/{userId} {
+      allow create: if request.auth != null && request.auth.uid == userId;
+      allow read, update, delete: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Règle pour la collection user_timetables
+    // Permet la lecture et l'écriture si l'utilisateur est authentifié (request.auth != null)
+    match /user_timetables/{userId} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}
