@@ -24,7 +24,11 @@ class _OptimizedSchedulePageState extends State<OptimizedSchedulePage> {
     if (_user == null) {
       return Scaffold(
         appBar: AppBar(title: const Text('Emploi du Temps Optimisé')),
-        body: const Center(child: Text('Veuillez vous connecter pour voir votre emploi du temps optimisé.')),
+        body: const Center(
+          child: Text(
+            'Veuillez vous connecter pour voir votre emploi du temps optimisé.',
+          ),
+        ),
       );
     }
 
@@ -34,7 +38,11 @@ class _OptimizedSchedulePageState extends State<OptimizedSchedulePage> {
       body: StreamBuilder<DocumentSnapshot>(
         // Assurez-vous que la collection et le document correspondent à l'endroit où vous stockez l'emploi du temps optimisé
         // Nous utiliserons l'UID de l'utilisateur comme nom de document
-        stream: FirebaseFirestore.instance.collection('optimized_schedules').doc(_user!.uid).snapshots(),
+        stream:
+            FirebaseFirestore.instance
+                .collection('optimized_schedules')
+                .doc(_user!.uid)
+                .snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
@@ -45,42 +53,57 @@ class _OptimizedSchedulePageState extends State<OptimizedSchedulePage> {
           }
 
           if (!snapshot.hasData || !snapshot.data!.exists) {
-            return const Center(child: Text('Aucun emploi du temps optimisé trouvé pour le moment.'));
+            return const Center(
+              child: Text(
+                'Aucun emploi du temps optimisé trouvé pour le moment.',
+              ),
+            );
           }
 
           // Les données de l'emploi du temps optimisé sont dans snapshot.data!.data()
           // Elles devraient être sous forme de Map<String, dynamic>
-          final Map<String, dynamic>? data = snapshot.data!.data() as Map<String, dynamic>?;
+          final Map<String, dynamic>? data =
+              snapshot.data!.data() as Map<String, dynamic>?;
 
           if (data == null || data.isEmpty) {
-             return const Center(child: Text('Aucun emploi du temps optimisé trouvé pour le moment.'));
+            return const Center(
+              child: Text(
+                'Aucun emploi du temps optimisé trouvé pour le moment.',
+              ),
+            );
           }
 
-          // TODO: Implémenter l'affichage des données dans un tableau ou une liste
-          // Vous devrez parser la structure JSON reçue de Gemini et l'afficher ici.
-          // Exemple très simple d'affichage brut des données JSON:
+          // Construction des lignes du tableau
+          final List<DataRow> rows = [];
+          data.forEach((jour, activites) {
+            if (activites is List) {
+              for (var tache in activites) {
+                rows.add(
+                  DataRow(
+                    cells: [
+                      DataCell(Text(jour[0].toUpperCase() + jour.substring(1))),
+                      DataCell(
+                        Text('${tache['startTime']} - ${tache['endTime']}'),
+                      ),
+                      DataCell(Text('${tache['activity']}')),
+                    ],
+                  ),
+                );
+              }
+            }
+          });
+
           return SingleChildScrollView(
             scrollDirection: Axis.vertical,
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: DataTable(
-                 columns: const <DataColumn>[
-                    // TODO: Définir les colonnes en fonction de la structure JSON optimisée
-                    DataColumn(label: Text('Jour')),
-                    DataColumn(label: Text('Heure')),
-                    DataColumn(label: Text('Activité')),
-                 ],
-                 rows: <DataRow>[
-                   // TODO: Remplir les lignes avec les données de 'data'
-                   // Cela dépendra fortement de la structure JSON renvoyée par Gemini
-                   // Exemple (à adapter):
-                   // DataRow(
-                   //   cells: <DataCell>[
-                   //     DataCell(Text(data['lundi'][0]['heure'])),
-                   //     DataCell(Text(data['lundi'][0]['activite'])),
-                   //   ],
-                   // ),
-                 ],
+                columns: const <DataColumn>[
+                  DataColumn(label: Text('Jour')),
+                  DataColumn(label: Text('Heure')),
+                  DataColumn(label: Text('Activité')),
+                ],
+                rows: rows,
               ),
             ),
           );

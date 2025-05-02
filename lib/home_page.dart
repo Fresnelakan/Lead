@@ -237,7 +237,7 @@ class _TimetableSetupScreenState extends State<TimetableSetupScreen> {
             'user_timetables',
           ) // Nom de la collection pour les emplois du temps bruts
           .doc(
-            user.uid,
+            FirebaseAuth.instance.currentUser!.uid,
           ); // Utiliser l'UID de l'utilisateur comme ID de document
 
       // Convertir la chaîne JSON en Map pour Firestore

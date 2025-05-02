@@ -16,10 +16,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   // Liste des couleurs de fond pour chaque page
   final List<Color> backgroundColors = [
-    const Color.fromARGB(255, 194, 238, 170), // Vert pour la page 1
-    const Color.fromARGB(255, 255, 186, 206), // Rose pour la page 2
-    const Color.fromARGB(255, 253, 218, 128), // Jaune pour la page 3
-    const Color.fromARGB(255, 198, 226, 255), // Bleu pour la page 4
+    const Color.fromARGB(255, 5, 228, 9), // Vert pour la page 1
+    const Color.fromARGB(255, 246, 171, 192), // Rose pour la page 2
+    const Color.fromARGB(255, 232, 188, 78), // Jaune pour la page 3
+    const Color.fromARGB(255, 102, 169, 242), // Bleu pour la page 4
   ];
 
   final List<Map<String, String>> onboardingData = [
