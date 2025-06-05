@@ -14,6 +14,10 @@ class LoginPage extends StatefulWidget {
   State<LoginPage> createState() => _LoginPageState();
 }
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> 637d1d9e1c0b74e994cb2cf823542e517546ecc8
 class _LoginPageState extends State<LoginPage> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
@@ -139,7 +143,11 @@ class _LoginPageState extends State<LoginPage> {
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: [
                       BoxShadow(
+<<<<<<< HEAD
                         color: Colors.black.withOpacity(0.1),
+=======
+                        color: Color.fromRGBO(0, 0, 0, 0.1),
+>>>>>>> 637d1d9e1c0b74e994cb2cf823542e517546ecc8
                         blurRadius: 12,
                         offset: const Offset(0, 6),
                       ),
@@ -233,8 +241,14 @@ class _LoginPageState extends State<LoginPage> {
                   ],
                 ),
                 const SizedBox(height: 16),
+<<<<<<< HEAD
                 
                const SizedBox(height: 8),
+=======
+
+
+                const SizedBox(height: 8),
+>>>>>>> 637d1d9e1c0b74e994cb2cf823542e517546ecc8
                                       TextButton(
                                         onPressed: () {
                                           Navigator.push(
@@ -249,6 +263,10 @@ class _LoginPageState extends State<LoginPage> {
                                       ),
             const SizedBox(height: 8),
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> 637d1d9e1c0b74e994cb2cf823542e517546ecc8
                 // Bouton Google
                 SizedBox(
                   width: double.infinity,

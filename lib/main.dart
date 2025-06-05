@@ -1,13 +1,41 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+<<<<<<< HEAD
+=======
+import 'package:flutter/foundation.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
+>>>>>>> 637d1d9e1c0b74e994cb2cf823542e517546ecc8
 import 'firebase_options.dart';
 import 'wrapper.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+<<<<<<< HEAD
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+=======
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  // Utilisez les émulateurs en mode debug
+if (kDebugMode) {
+  try {
+
+    FirebaseFirestore.instance.useFirestoreEmulator('localhost', 8080); // Le port par défaut de l'émulateur Firestore est 8080
+    // Si vous utilisez l'émulateur Authentication, décommentez la ligne suivante
+    FirebaseAuth.instance.useAuthEmulator('localhost', 9099); // Le port par défaut est 9099
+    // Bien que votre fonction soit déclenchée par Firestore, si vous avez besoin d'appeler des fonctions HTTP/Callable depuis Flutter,
+    // vous devriez configurer l'émulateur Functions ici :
+    // FirebaseFunctions.instance.useFunctionsEmulator('localhost', 5001); // Le port par défaut est 5001
+  } catch (e) {
+    // Gérer les erreurs si les émulateurs ne sont pas en cours d'exécution (facultatif)
+    print('Erreur lors de la connexion aux émulateurs : $e');
+  }
+}
+
+>>>>>>> 637d1d9e1c0b74e994cb2cf823542e517546ecc8
   runApp(const MyApp());
 }
 
@@ -21,8 +49,24 @@ class MyApp extends StatelessWidget {
       title: 'Mon App',
       theme: ThemeData(
         primarySwatch: Colors.blue,
+        scaffoldBackgroundColor: const Color(0xFFF5F5F5), // Ou Colors.white
+        colorScheme: ColorScheme.light(
+          // Couleur de fond globale
+        ),
+        bottomNavigationBarTheme: BottomNavigationBarThemeData(
+          backgroundColor: Colors.white,
+          selectedItemColor: Colors.black,
+          unselectedItemColor: Colors.grey[700],
+          selectedIconTheme: IconThemeData(color: Colors.black),
+          unselectedIconTheme: IconThemeData(color: Colors.grey[700]),
+        ),
       ),
+<<<<<<< HEAD
       home: const Wrapper(), // Un seul 'home' nécessaire
+=======
+
+      home: const Wrapper(),
+>>>>>>> 637d1d9e1c0b74e994cb2cf823542e517546ecc8
     );
   }
 }

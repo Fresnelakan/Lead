@@ -1,5 +1,9 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+<<<<<<< HEAD
+=======
+import 'package:logger/logger.dart';
+>>>>>>> 637d1d9e1c0b74e994cb2cf823542e517546ecc8
 
 class GoogleAuthService {
   // ID client Android uniquement (le web utilise le meta-tag HTML)
@@ -39,7 +43,13 @@ class GoogleAuthService {
 
   Future<UserCredential?> signInWithGoogle() async {
     try {
+<<<<<<< HEAD
       print('Plateforme: ${_isWeb ? "WEB" : "MOBILE"}');
+=======
+      final logger = Logger();
+      logger.e('Plateforme: ${_isWeb ? "WEB" : "MOBILE"}'); 
+      
+>>>>>>> 637d1d9e1c0b74e994cb2cf823542e517546ecc8
 
       final googleUser = await _googleSignIn.signIn();
       if (googleUser == null) return null;
@@ -61,10 +71,21 @@ class GoogleAuthService {
       return await _auth.signInWithCredential(credential);
 
     } on FirebaseAuthException catch (e) {
+<<<<<<< HEAD
       print('Erreur Firebase: ${e.code} - ${e.message}');
       rethrow;
     } catch (e) {
       print('Erreur inattendue: $e');
+=======
+      final logger = Logger();
+      logger.e('Erreur Firebase: ${e.code} - ${e.message}');
+      
+      rethrow;
+    } catch (e) {
+
+      final logger = Logger();
+      logger.e('Erreur inattendue: $e');
+>>>>>>> 637d1d9e1c0b74e994cb2cf823542e517546ecc8
       throw FirebaseAuthException(
         code: 'operation-failed',
         message: 'Échec de la connexion Google',
@@ -79,7 +100,12 @@ class GoogleAuthService {
         _auth.signOut(),
       ]);
     } catch (e) {
+<<<<<<< HEAD
       print('Erreur lors de la déconnexion: $e');
+=======
+      final logger = Logger();
+      logger.e('Erreur lors de la déconnexion: $e');
+>>>>>>> 637d1d9e1c0b74e994cb2cf823542e517546ecc8
       rethrow;
     }
   }
