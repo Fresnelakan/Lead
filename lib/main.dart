@@ -3,20 +3,12 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart'; // Importe le plugin
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'firebase_options.dart';
 import 'wrapper.dart';
-import 'services/notification_service.dart'; // Importe votre service
+import 'services/notification_service.dart';
 
-// Déclarez l'instance globale de votre NotificationService.
-// Il est 'late' car il sera initialisé dans main() avant d'être utilisé par runApp().
 late NotificationService notificationService;
-
-Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  print('Notification en arrière-plan : ${message.notification?.title}');
-}
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -31,9 +23,8 @@ void main() async {
     }
   }
 
-  // --- Initialise le FlutterLocalNotificationsPlugin directement ici ---
-  await NotificationService.configureTimeZone(); // Configure le fuseau horaire en premier
-
+  // Initialiser le fuseau horaire et les notifications locales
+  await NotificationService.configureTimeZone();
   final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
       FlutterLocalNotificationsPlugin();
 
@@ -45,8 +36,7 @@ void main() async {
     requestBadgePermission: true,
     requestSoundPermission: true,
   );
-  const InitializationSettings initializationSettings =
-      InitializationSettings(
+  const InitializationSettings initializationSettings = InitializationSettings(
     android: androidInitialization,
     iOS: iosInitialization,
   );
@@ -56,24 +46,8 @@ void main() async {
     onDidReceiveNotificationResponse: NotificationService.onDidReceiveNotificationResponseCallback,
     onDidReceiveBackgroundNotificationResponse: NotificationService.onDidReceiveBackgroundNotificationResponseCallback,
   );
-  // --- Fin de l'initialisation du Flutter Local Notifications Plugin ---
 
-  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-  FirebaseMessaging messaging = FirebaseMessaging.instance;
-  NotificationSettings settings = await messaging.requestPermission(
-    alert: true, badge: true, sound: true,
-  );
-  if (settings.authorizationStatus == AuthorizationStatus.authorized) {
-    String? token = await messaging.getToken();
-    if (token != null && FirebaseAuth.instance.currentUser?.uid != null) {
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(FirebaseAuth.instance.currentUser!.uid)
-          .set({'fcmToken': token}, SetOptions(merge: true));
-    }
-  }
-
-  // Crée une instance de votre NotificationService en lui passant le plugin *initialisé*
+  // Initialiser NotificationService
   notificationService = NotificationService(flutterLocalNotificationsPlugin);
 
   runApp(const MyApp());
