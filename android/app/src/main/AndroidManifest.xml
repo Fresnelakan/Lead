@@ -1,12 +1,54 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
-    <uses-permission android:name="android.permission.VIBRATE"/>
-    <uses-permission android:name="android.permission.WAKE_LOCK"/>
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <!-- android/app/src/main/AndroidManifest.xml -->
+    <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+        <!-- Permissions Internet, Vibration et Wake Lock sont cruciales -->
+        <uses-permission android:name="android.permission.INTERNET"/>
+        <uses-permission android:name="android.permission.VIBRATE"/>
+        <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+        <uses-permission android:name="android.permission.WAKE_LOCK"/>
+        <!-- Permission pour les notifications push pour Android 13 (API 33) et versions ultérieures -->
+        <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/> 
 
-    <application
-        android:label="lead"
-        android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        <application
+            android:label="Lead"
+            android:name="${applicationName}"
+            android:icon="@mipmap/ic_launcher"
+            android:usesCleartextTraffic="true"> <!-- Ajouté pour permettre le trafic HTTP en débogage si besoin -->
+            <activity
+                android:name=".MainActivity"
+                android:exported="true"
+                android:launchMode="singleTop"
+                android:theme="@style/LaunchTheme"
+                android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
+                android:hardwareAccelerated="true"
+                android:windowSoftInputMode="adjustResize">
+                <!-- Spécifier le canal de notification par défaut si nécessaire -->
+                <meta-data
+                    android:name="flutterEmbedding"
+                    android:value="2" />
+            </activity>
+
+            <!-- Receveurs pour flutter_local_notifications : Très important ! -->
+            <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver" />
+            <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver">
+                <intent-filter>
+                    <action android:name="android.intent.action.BOOT_COMPLETED"/>
+                    <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>
+                    <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                    <action android:name="com.htc.intent.action.QUICKBOOT_POWERON" />
+                </intent-filter>
+            </receiver>
+            <!-- Fin Flutter Local Notifications -->
+
+            <!-- Métadonnées Firebase pour définir le canal de notification par défaut de FCM -->
+            <!-- L'ID ici doit correspondre à 'lead_channel_id' dans votre NotificationService -->
+            <meta-data
+                android:name="com.google.firebase.messaging.default_notification_channel_id"
+                android:value="lead_channel_id"/>
+            
+            <!-- Si vous avez des problèmes d'émulateurs Firebase sur Android, et que vous utilisez les émulateurs locaux -->
+            <!-- Vous pouvez ajouter ceci pour le développement, mais retirez-le en production -->
+            <!-- <uses-cleartext-traffic android:value="true" /> -->
+            
         </application>
-</manifest>
+    </manifest>
+    
