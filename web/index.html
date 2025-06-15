@@ -37,3 +37,16 @@
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>
+<!-- web/index.html -->
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('./firebase-messaging-sw.js')
+        .then(function(registration) {
+          console.log('Service Worker enregistré avec succès : ', registration.scope);
+        }).catch(function(err) {
+          console.error('Échec de l\'enregistrement du Service Worker : ', err);
+        });
+    });
+  }
+</script>

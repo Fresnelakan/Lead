@@ -3,75 +3,81 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart'; // Importez le package
-import 'package:timezone/timezone.dart' as tz; // Importez timezone
-import 'package:timezone/data/latest.dart' as tz; // Importez les données de fuseau horaire
-import 'package:flutter_native_timezone/flutter_native_timezone.dart'; // Importez pour le fuseau horaire natif
-
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart'; // Importe le plugin
 import 'firebase_options.dart';
 import 'wrapper.dart';
+import 'services/notification_service.dart'; // Importe votre service
 
-// Créez une instance globale du plugin de notification
-final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
-    FlutterLocalNotificationsPlugin();
+// Déclarez l'instance globale de votre NotificationService.
+// Il est 'late' car il sera initialisé dans main() avant d'être utilisé par runApp().
+late NotificationService notificationService;
 
-Future<void> main() async {
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  print('Notification en arrière-plan : ${message.notification?.title}');
+}
+
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
-  // Initialisation des notifications locales
-  await _configureLocalNotifications(); // Appelez la fonction d'initialisation
-
-  // Utilisez les émulateurs en mode debug
   if (kDebugMode) {
     try {
       FirebaseFirestore.instance.useFirestoreEmulator('localhost', 8080);
       FirebaseAuth.instance.useAuthEmulator('localhost', 9099);
     } catch (e) {
-      print('Erreur lors de la connexion aux émulateurs : $e');
+      print('Erreur émulateurs : $e');
     }
   }
 
-  runApp(const MyApp());
-}
+  // --- Initialise le FlutterLocalNotificationsPlugin directement ici ---
+  await NotificationService.configureTimeZone(); // Configure le fuseau horaire en premier
 
-// Fonction d'initialisation des notifications locales
-Future<void> _configureLocalNotifications() async {
-  // Initialiser Timezone pour les notifications planifiées
-  tz.initializeTimeZones();
-  final String? timeZoneName = await FlutterNativeTimezone.getLocalTimezone();
-  tz.setLocalLocation(tz.getLocation(timeZoneName!));
+  final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
+      FlutterLocalNotificationsPlugin();
 
-  const AndroidInitializationSettings initializationSettingsAndroid =
-      AndroidInitializationSettings('@mipmap/ic_launcher'); // Assurez-vous d'avoir cette icône
-
-  const DarwinInitializationSettings initializationSettingsIOS =
+  const AndroidInitializationSettings androidInitialization =
+      AndroidInitializationSettings('@mipmap/ic_launcher');
+  const DarwinInitializationSettings iosInitialization =
       DarwinInitializationSettings(
     requestAlertPermission: true,
     requestBadgePermission: true,
     requestSoundPermission: true,
   );
-
-  const InitializationSettings initializationSettings = InitializationSettings(
-    android: initializationSettingsAndroid,
-    iOS: initializationSettingsIOS,
+  const InitializationSettings initializationSettings =
+      InitializationSettings(
+    android: androidInitialization,
+    iOS: iosInitialization,
   );
 
   await flutterLocalNotificationsPlugin.initialize(
     initializationSettings,
-    onDidReceiveNotificationResponse: (NotificationResponse notificationResponse) async {
-      // Gérer la réponse de la notification (quand l'utilisateur clique dessus)
-      // Vous pouvez naviguer vers une page spécifique ou effectuer une action
-      print('Notification cliquée ! Payload: ${notificationResponse.payload}');
-      // Exemple: Navigator.push(context, MaterialPageRoute(builder: (context) => SomeDetailPage(payload: notificationResponse.payload)));
-    },
-    onDidReceiveBackgroundNotificationResponse: (NotificationResponse notificationResponse) async {
-      // Gérer la réponse de la notification en arrière-plan (Android 12+)
-      print('Notification cliquée en arrière-plan ! Payload: ${notificationResponse.payload}');
-    }
+    onDidReceiveNotificationResponse: NotificationService.onDidReceiveNotificationResponseCallback,
+    onDidReceiveBackgroundNotificationResponse: NotificationService.onDidReceiveBackgroundNotificationResponseCallback,
   );
-}
+  // --- Fin de l'initialisation du Flutter Local Notifications Plugin ---
 
+  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+  FirebaseMessaging messaging = FirebaseMessaging.instance;
+  NotificationSettings settings = await messaging.requestPermission(
+    alert: true, badge: true, sound: true,
+  );
+  if (settings.authorizationStatus == AuthorizationStatus.authorized) {
+    String? token = await messaging.getToken();
+    if (token != null && FirebaseAuth.instance.currentUser?.uid != null) {
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(FirebaseAuth.instance.currentUser!.uid)
+          .set({'fcmToken': token}, SetOptions(merge: true));
+    }
+  }
+
+  // Crée une instance de votre NotificationService en lui passant le plugin *initialisé*
+  notificationService = NotificationService(flutterLocalNotificationsPlugin);
+
+  runApp(const MyApp());
+}
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
@@ -80,19 +86,17 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Mon App',
+      title: 'Lead',
       theme: ThemeData(
         primarySwatch: Colors.blue,
         scaffoldBackgroundColor: const Color(0xFFF5F5F5),
-        colorScheme: const ColorScheme.light(
-          // Couleur de fond globale
-        ),
+        colorScheme: const ColorScheme.light(),
         bottomNavigationBarTheme: BottomNavigationBarThemeData(
           backgroundColor: Colors.white,
           selectedItemColor: Colors.black,
           unselectedItemColor: Colors.grey[700],
           selectedIconTheme: const IconThemeData(color: Colors.black),
-          unselectedIconTheme: const IconThemeData(color: Colors.black),
+          unselectedIconTheme: const IconThemeData(color: Colors.grey),
         ),
       ),
       home: const Wrapper(),

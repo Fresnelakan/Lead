@@ -1,7 +1,3 @@
-<<<<<<< HEAD
-# Lead
-A pretty mobile app (flutter) that manage the students time by using AI and OR-tools.
-=======
 # Projet Lead : Application d'Optimisation d'Emploi du Temps Étudiant
 
 ## Description du Projet
@@ -114,4 +110,3 @@ Pour exécuter le projet dans l'environnement de développement local, vous aure
 * MAZOU Marzouk
 
 ---
->>>>>>> 637d1d9e1c0b74e994cb2cf823542e517546ecc8
