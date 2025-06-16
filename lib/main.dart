@@ -1,22 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-<<<<<<< HEAD
-=======
 import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
->>>>>>> 637d1d9e1c0b74e994cb2cf823542e517546ecc8
 import 'firebase_options.dart';
 import 'wrapper.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-<<<<<<< HEAD
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
-=======
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
   // Utilisez les émulateurs en mode debug
@@ -35,7 +27,6 @@ if (kDebugMode) {
   }
 }
 
->>>>>>> 637d1d9e1c0b74e994cb2cf823542e517546ecc8
   runApp(const MyApp());
 }
 
@@ -61,12 +52,8 @@ class MyApp extends StatelessWidget {
           unselectedIconTheme: IconThemeData(color: Colors.grey[700]),
         ),
       ),
-<<<<<<< HEAD
-      home: const Wrapper(), // Un seul 'home' nécessaire
-=======
 
       home: const Wrapper(),
->>>>>>> 637d1d9e1c0b74e994cb2cf823542e517546ecc8
     );
   }
 }
