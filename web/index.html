@@ -35,18 +35,21 @@
 </head>
 <body>
   <script src="flutter_bootstrap.js" async></script>
+
+  <!-- IMPORTANT: Le script d'enregistrement du Service Worker DOIT être à l'intérieur de la balise <body> -->
+  <!-- Il est préférable de le placer après 'flutter_bootstrap.js' ou juste avant la balise </body> de fermeture. -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function () {
+        // Utilisez un chemin absolu pour le Service Worker à la racine
+        navigator.serviceWorker.register('/firebase-messaging-sw.js')
+          .then(function(registration) {
+            console.log('Service Worker enregistré avec succès : ', registration.scope);
+          }).catch(function(err) {
+            console.error('Échec de l\'enregistrement du Service Worker : ', err);
+          });
+      });
+    }
+  </script>
 </body>
 </html>
-<!-- web/index.html -->
-<script>
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', function () {
-      navigator.serviceWorker.register('./firebase-messaging-sw.js')
-        .then(function(registration) {
-          console.log('Service Worker enregistré avec succès : ', registration.scope);
-        }).catch(function(err) {
-          console.error('Échec de l\'enregistrement du Service Worker : ', err);
-        });
-    });
-  }
-</script>
