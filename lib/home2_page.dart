@@ -14,149 +14,38 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  int _selectedIndex = 1; // Page par défaut : "Schedule"
-
-  final List<String> _pageTitles = const [
-    'Applications',
-    'Mon Emploi du Temps',
-    'Notifications',
-    'Emploi du Temps Optimisé',
+  int _currentIndex = 1;
+  final List<Widget> _pages = [
+    const AppsPage(),
+    const TimetableSetupScreen(),
+    const NotificationsPage(),
+    const OptimizedSchedulePage(),
   ];
-
-  late List<Widget> _pages;
-
-  @override
-  void initState() {
-    super.initState();
-    _pages = [
-      const AppsPage(),
-      TimetableSetupScreen(onSubmitted: _onTimetableSetupComplete),
-      const NotificationsPage(),
-      const TimetableViewScreen(), // Remplacé OptimizedSchedulePage par TimetableViewScreen
-    ];
-  }
-
-  void _onTimetableSetupComplete() {
-    setState(() {
-      _selectedIndex = 3; // Passe à "Emploi du Temps Optimisé"
-    });
-  }
-
-  void _onItemTapped(int index) {
-    setState(() {
-      _selectedIndex = index;
-    });
-    Navigator.pop(context); // Ferme le Drawer
-  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(_pageTitles[_selectedIndex]),
-        backgroundColor: Colors.blue[50],
-        elevation: 0,
-        foregroundColor: Colors.black,
-        leading: Builder(
-          builder: (context) => IconButton(
-            icon: const Icon(Icons.menu),
-            onPressed: () => Scaffold.of(context).openDrawer(),
-          ),
-        ),
+      body: IndexedStack(index: _currentIndex, children: _pages),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _currentIndex,
+        onTap: (index) => setState(() => _currentIndex = index),
+        selectedItemColor: Colors.black,
+        unselectedItemColor: Colors.grey[700],
+        backgroundColor: Colors.white,
+        type: BottomNavigationBarType.fixed,
+        items: const [
+          BottomNavigationBarItem(icon: Icon(Icons.apps), label: 'Apps'),
+          BottomNavigationBarItem(icon: Icon(Icons.schedule), label: 'Schedule'),
+          BottomNavigationBarItem(icon: Icon(Icons.notifications), label: 'Notifications'),
+          BottomNavigationBarItem(icon: Icon(Icons.check_circle_outline), label: 'Optimisé'),
+        ],
       ),
-      drawer: Drawer(
-        child: ListView(
-          padding: EdgeInsets.zero,
-          children: <Widget>[
-            DrawerHeader(
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Colors.blue, Colors.blueAccent],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: const [
-                  CircleAvatar(
-                    radius: 30,
-                    backgroundColor: Colors.white,
-                    child: Icon(Icons.person, size: 40, color: Colors.blue),
-                  ),
-                  SizedBox(height: 8),
-                  Text(
-                    'Bienvenue, Étudiant !',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            ..._pageTitles.asMap().entries.map((entry) {
-              final index = entry.key;
-              final title = entry.value;
-              return ListTile(
-                leading: Icon(
-                  [
-                    Icons.apps,
-                    Icons.schedule,
-                    Icons.notifications,
-                    Icons.check_circle_outline,
-                  ][index],
-                ),
-                title: Text(title),
-                selected: _selectedIndex == index,
-                onTap: () => _onItemTapped(index),
-              );
-            }),
-            const Divider(),
-            ListTile(
-              leading: const Icon(Icons.logout),
-              title: const Text('Déconnexion'),
-              onTap: () async {
-                await FirebaseAuth.instance.signOut();
-                if (mounted) {
-                  Navigator.pop(context); // Ferme le Drawer
-                }
-              },
-            ),
-          ],
-        ),
-      ),
-      body: _pages[_selectedIndex],
     );
   }
 }
 
-class ActivityDisplay {
-  final String name;
-  final bool isFirstSlot;
-  final int spanCount;
-  final String startTime;
-  final String endTime;
-  final String priority;
-  final String day;
-
-  ActivityDisplay({
-    required this.name,
-    required this.isFirstSlot,
-    required this.spanCount,
-    required this.startTime,
-    required this.endTime,
-    required this.priority,
-    required this.day,
-  });
-}
-
 class TimetableSetupScreen extends StatefulWidget {
-  final VoidCallback onSubmitted;
-
-  const TimetableSetupScreen({super.key, required this.onSubmitted});
+  const TimetableSetupScreen({super.key});
 
   @override
   State<TimetableSetupScreen> createState() => _TimetableSetupScreenState();
@@ -164,56 +53,19 @@ class TimetableSetupScreen extends StatefulWidget {
 
 class _TimetableSetupScreenState extends State<TimetableSetupScreen> {
   final List<String> _days = [
-    'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche',
+    'Lundi',
+    'Mardi',
+    'Mercredi',
+    'Jeudi',
+    'Vendredi',
+    'Samedi',
+    'Dimanche',
   ];
   int _currentDayIndex = 0;
   final List<List<TimeSlot>> _timeSlots = List.generate(7, (_) => []);
   final Set<int> _errorIndexes = {};
 
-  @override
-  void initState() {
-    super.initState();
-    _loadInitialTimetable();
-  }
-
-  Future<void> _loadInitialTimetable() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
-
-    try {
-      final doc = await FirebaseFirestore.instance
-          .collection('user_timetables')
-          .doc(user.uid)
-          .get();
-
-      if (doc.exists && doc.data() != null) {
-        final data = doc.data()!;
-        for (int i = 0; i < _days.length; i++) {
-          final dayName = _days[i].toLowerCase();
-          if (data[dayName] is List) {
-            _timeSlots[i].clear();
-            for (var entry in data[dayName]) {
-              _timeSlots[i].add(TimeSlot()
-                ..activity = entry['activity'] ?? ''
-                ..startTime = _parseTimeOfDay(entry['startTime'])
-                ..endTime = _parseTimeOfDay(entry['endTime']));
-            }
-          }
-        }
-        if (mounted) setState(() {});
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erreur lors du chargement: $e')),
-      );
-    }
-  }
-
-  TimeOfDay _parseTimeOfDay(String timeString) {
-    final parts = timeString.split(':');
-    return TimeOfDay(hour: int.parse(parts[0]), minute: int.parse(parts[1]));
-  }
-
+  // Fonction pour formater l'heure au format 24h
   String _formatTimeTo24Hour(TimeOfDay time) {
     final hour = time.hour.toString().padLeft(2, '0');
     final minute = time.minute.toString().padLeft(2, '0');
@@ -222,11 +74,12 @@ class _TimetableSetupScreenState extends State<TimetableSetupScreen> {
 
   void _addTimeSlot() {
     final slots = _timeSlots[_currentDayIndex];
-
+    
+    // Vérifier que la tâche précédente est remplie
     if (slots.isNotEmpty && slots.last.activity.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Veuillez remplir la tâche précédente.'),
+          content: Text('Veuillez remplir la tâche précédente avant d\'en ajouter une nouvelle.'),
           backgroundColor: Colors.orange,
         ),
       );
@@ -234,6 +87,7 @@ class _TimetableSetupScreenState extends State<TimetableSetupScreen> {
       return;
     }
 
+    // Vérifier que l'heure de fin > heure de début
     if (slots.isNotEmpty && !_isEndAfterStart(slots.last.startTime, slots.last.endTime)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -249,11 +103,13 @@ class _TimetableSetupScreenState extends State<TimetableSetupScreen> {
     if (slots.isNotEmpty) {
       start = slots.last.endTime;
     }
-
+    
     setState(() {
       slots.add(TimeSlot()
         ..startTime = start
-        ..endTime = start);
+        ..endTime = start
+        ..priority = 'medium' // Priorité par défaut
+      );
       _errorIndexes.clear();
     });
   }
@@ -308,16 +164,29 @@ class _TimetableSetupScreenState extends State<TimetableSetupScreen> {
     if (_currentDayIndex < _days.length - 1) {
       setState(() => _currentDayIndex++);
     } else {
-      final jsonTimetable = _buildJsonTimetable();
+      final String jsonTimetable = _buildJsonTimetable();
       await _sendTimetableToFirestore(jsonTimetable);
-      widget.onSubmitted();
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const TimetableViewScreen()),
+      );
     }
   }
 
   String _buildJsonTimetable() {
-    final timetableData = <String, dynamic>{};
+    final Map<String, dynamic> timetableData = {};
+    final List<String> days = [
+      'Lundi',
+      'Mardi',
+      'Mercredi',
+      'Jeudi',
+      'Vendredi',
+      'Samedi',
+      'Dimanche',
+    ];
+
     for (int i = 0; i < _timeSlots.length; i++) {
-      final daySchedule = <Map<String, dynamic>>[];
+      final List<Map<String, dynamic>> daySchedule = [];
       for (var timeSlot in _timeSlots[i]) {
         if (timeSlot.activity.trim().isNotEmpty) {
           daySchedule.add({
@@ -325,12 +194,13 @@ class _TimetableSetupScreenState extends State<TimetableSetupScreen> {
             'endTime': _formatTimeTo24Hour(timeSlot.endTime),
             'activity': timeSlot.activity,
             'type': 'course',
-            'priority': 'medium', // Priorité par défaut
+            'priority': timeSlot.priority, // Utiliser la priorité définie par l'utilisateur
           });
         }
       }
-      timetableData[_days[i].toLowerCase()] = daySchedule;
+      timetableData[days[i].toLowerCase()] = daySchedule;
     }
+
     return jsonEncode(timetableData);
   }
 
@@ -338,27 +208,25 @@ class _TimetableSetupScreenState extends State<TimetableSetupScreen> {
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Utilisateur non connecté.')),
-        );
+        print('Utilisateur non connecté, impossible d\'envoyer l\'emploi du temps.');
         return;
       }
 
-      final timetableData = jsonDecode(jsonTimetable);
-      await FirebaseFirestore.instance
+      final timetableRef = FirebaseFirestore.instance
           .collection('user_timetables')
-          .doc(user.uid)
-          .set(timetableData);
+          .doc(FirebaseAuth.instance.currentUser!.uid);
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Emploi du temps enregistré avec succès !'),
-          backgroundColor: Colors.green,
-        ),
-      );
+      final Map<String, dynamic> timetableData = jsonDecode(jsonTimetable);
+      await timetableRef.set(timetableData);
+
+      print('Emploi du temps envoyé avec succès à Firestore pour l\'utilisateur ${user.uid}');
     } catch (e) {
+      print('Erreur lors de l\'envoi de l\'emploi du temps à Firestore: $e');
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erreur lors de l\'enregistrement: $e')),
+        SnackBar(
+          content: Text('Erreur lors de l\'envoi de l\'emploi du temps : $e'),
+          backgroundColor: Colors.red,
+        ),
       );
     }
   }
@@ -378,12 +246,6 @@ class _TimetableSetupScreenState extends State<TimetableSetupScreen> {
         backgroundColor: Colors.blue[50],
         elevation: 0,
         foregroundColor: Colors.black,
-        leading: Builder(
-          builder: (context) => IconButton(
-            icon: const Icon(Icons.menu),
-            onPressed: () => Scaffold.of(context).openDrawer(),
-          ),
-        ),
       ),
       body: Container(
         decoration: BoxDecoration(
@@ -448,6 +310,11 @@ class _TimetableSetupScreenState extends State<TimetableSetupScreen> {
                           error: _errorIndexes.contains(index),
                           onRemove: () => _removeTimeSlot(index),
                           index: index,
+                          onPriorityChanged: (newPriority) {
+                            setState(() {
+                              _timeSlots[_currentDayIndex][index].priority = newPriority;
+                            });
+                          },
                         ),
                       ),
               ),
@@ -463,6 +330,7 @@ class _TimetableSetupScreenState extends State<TimetableSetupScreen> {
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        elevation: 2,
                       ),
                       onPressed: _addTimeSlot,
                     ),
@@ -471,12 +339,15 @@ class _TimetableSetupScreenState extends State<TimetableSetupScreen> {
                   Expanded(
                     child: ElevatedButton.icon(
                       icon: Icon(_currentDayIndex == _days.length - 1 ? Icons.check : Icons.arrow_forward),
-                      label: Text(_currentDayIndex == _days.length - 1 ? "Terminer" : "Jour suivant"),
+                      label: Text(
+                        _currentDayIndex == _days.length - 1 ? "Terminer" : "Jour suivant",
+                      ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.blue,
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        elevation: 2,
                       ),
                       onPressed: _nextDay,
                     ),
@@ -495,6 +366,7 @@ class TimeSlot {
   TimeOfDay startTime = TimeOfDay.now();
   TimeOfDay endTime = TimeOfDay.now();
   String activity = '';
+  String priority = 'medium'; // Nouvelle propriété pour la priorité
 }
 
 class TimeSlotEntry extends StatefulWidget {
@@ -502,6 +374,7 @@ class TimeSlotEntry extends StatefulWidget {
   final bool error;
   final VoidCallback onRemove;
   final int index;
+  final Function(String) onPriorityChanged;
 
   const TimeSlotEntry({
     super.key,
@@ -509,6 +382,7 @@ class TimeSlotEntry extends StatefulWidget {
     this.error = false,
     required this.onRemove,
     required this.index,
+    required this.onPriorityChanged,
   });
 
   @override
@@ -519,6 +393,13 @@ class _TimeSlotEntryState extends State<TimeSlotEntry> with SingleTickerProvider
   late AnimationController _controller;
   late Animation<Color?> _colorAnimation;
   late TextEditingController _textController;
+
+  // Options de priorité disponibles
+  final List<Map<String, dynamic>> _priorityOptions = [
+    {'value': 'low', 'label': 'Pas important', 'color': Colors.green},
+    {'value': 'medium', 'label': 'Utile', 'color': Colors.orange},
+    {'value': 'high', 'label': 'Très utile', 'color': Colors.red},
+  ];
 
   @override
   void initState() {
@@ -553,6 +434,22 @@ class _TimeSlotEntryState extends State<TimeSlotEntry> with SingleTickerProvider
     _controller.dispose();
     _textController.dispose();
     super.dispose();
+  }
+
+  Color _getPriorityColor(String priority) {
+    final option = _priorityOptions.firstWhere(
+      (p) => p['value'] == priority,
+      orElse: () => _priorityOptions[1], // medium par défaut
+    );
+    return option['color'];
+  }
+
+  String _getPriorityLabel(String priority) {
+    final option = _priorityOptions.firstWhere(
+      (p) => p['value'] == priority,
+      orElse: () => _priorityOptions[1], // medium par défaut
+    );
+    return option['label'];
   }
 
   @override
@@ -593,6 +490,23 @@ class _TimeSlotEntryState extends State<TimeSlotEntry> with SingleTickerProvider
                       ),
                     ),
                     const Spacer(),
+                    // Indicateur de priorité
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: _getPriorityColor(widget.timeSlot.priority),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        _getPriorityLabel(widget.timeSlot.priority),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
                     IconButton(
                       icon: const Icon(Icons.delete_outline, color: Colors.red),
                       onPressed: widget.onRemove,
@@ -622,7 +536,7 @@ class _TimeSlotEntryState extends State<TimeSlotEntry> with SingleTickerProvider
                                   context: context,
                                   initialTime: widget.timeSlot.startTime,
                                 );
-                                if (time != null && mounted) {
+                                if (time != null) {
                                   setState(() => widget.timeSlot.startTime = time);
                                 }
                               },
@@ -658,7 +572,7 @@ class _TimeSlotEntryState extends State<TimeSlotEntry> with SingleTickerProvider
                                   context: context,
                                   initialTime: widget.timeSlot.endTime,
                                 );
-                                if (time != null && mounted) {
+                                if (time != null) {
                                   setState(() => widget.timeSlot.endTime = time);
                                 }
                               },
@@ -687,6 +601,57 @@ class _TimeSlotEntryState extends State<TimeSlotEntry> with SingleTickerProvider
                   ),
                   onChanged: (value) => widget.timeSlot.activity = value,
                 ),
+                const SizedBox(height: 16),
+                // Sélecteur de priorité
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      "Importance de la tâche",
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey[300]!),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          value: widget.timeSlot.priority,
+                          icon: const Icon(Icons.arrow_drop_down),
+                          isExpanded: true,
+                          onChanged: (String? newValue) {
+                            if (newValue != null) {
+                              widget.onPriorityChanged(newValue);
+                            }
+                          },
+                          items: _priorityOptions.map<DropdownMenuItem<String>>((option) {
+                            return DropdownMenuItem<String>(
+                              value: option['value'],
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 12,
+                                    height: 12,
+                                    decoration: BoxDecoration(
+                                      color: option['color'],
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(option['label']),
+                                ],
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ],
             ),
           ),
@@ -707,10 +672,6 @@ class _TimetableViewScreenState extends State<TimetableViewScreen> {
   Map<String, dynamic>? timetableData;
   bool isLoading = true;
   bool isOptimized = false;
-  int _selectedDayIndex = 0;
-  final List<String> _days = [
-    'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche',
-  ];
 
   @override
   void initState() {
@@ -721,95 +682,93 @@ class _TimetableViewScreenState extends State<TimetableViewScreen> {
   Future<void> _loadTimetable() async {
     try {
       final user = FirebaseAuth.instance.currentUser;
-      if (user == null) {
-        setState(() => isLoading = false);
-        return;
-      }
+      if (user != null) {
+        final optimizedDoc = await FirebaseFirestore.instance
+            .collection('optimized_schedules')
+            .doc(user.uid)
+            .get();
 
-      final optimizedDoc = await FirebaseFirestore.instance
-          .collection('optimized_schedules')
-          .doc(user.uid)
-          .get();
-
-      if (optimizedDoc.exists && optimizedDoc.data() != null) {
-        if (mounted) {
+        if (optimizedDoc.exists && optimizedDoc.data() != null) {
+          print('✅ Emploi du temps optimisé trouvé');
           setState(() {
             timetableData = optimizedDoc.data();
             isOptimized = true;
             isLoading = false;
           });
-        }
-        return;
-      }
+        } else {
+          print('⚠️ Pas d\'emploi du temps optimisé, chargement de l\'original');
+          final originalDoc = await FirebaseFirestore.instance
+              .collection('user_timetables')
+              .doc(user.uid)
+              .get();
 
-      final originalDoc = await FirebaseFirestore.instance
-          .collection('user_timetables')
-          .doc(user.uid)
-          .get();
-
-      if (originalDoc.exists && originalDoc.data() != null) {
-        if (mounted) {
-          setState(() {
-            timetableData = originalDoc.data();
-            isOptimized = false;
-            isLoading = false;
-          });
+          if (originalDoc.exists && originalDoc.data() != null) {
+            print('✅ Emploi du temps original trouvé');
+            setState(() {
+              timetableData = originalDoc.data();
+              isOptimized = false;
+              isLoading = false;
+            });
+          } else {
+            print('❌ Aucun emploi du temps trouvé');
+            setState(() {
+              isLoading = false;
+            });
+          }
         }
-      } else {
-        if (mounted) setState(() => isLoading = false);
       }
     } catch (e) {
-      if (mounted) {
-        setState(() => isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erreur lors du chargement: $e')),
-        );
-      }
+      print('❌ Erreur lors du chargement de l\'emploi du temps: $e');
+      setState(() {
+        isLoading = false;
+      });
     }
   }
 
-  Future<void> _updateActivityPriority(
-      String day, String activityName, String startTime, String endTime, String newPriority) async {
+  // Nouvelle méthode pour mettre à jour la priorité d'une activité
+  Future<void> _updateActivityPriority(String day, String activityName, String startTime, String endTime, String newPriority) async {
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) return;
 
-      if (mounted) {
-        setState(() {
-          final dayData = timetableData?[day.toLowerCase()] as List<dynamic>?;
-          if (dayData != null) {
-            for (var activity in dayData) {
-              if (activity['activity'] == activityName &&
-                  activity['startTime'] == startTime &&
-                  activity['endTime'] == endTime) {
-                activity['priority'] = newPriority;
-                break;
-              }
+      // Mise à jour locale
+      setState(() {
+        final dayData = timetableData![day.toLowerCase()] as List<dynamic>?;
+        if (dayData != null) {
+          for (var activity in dayData) {
+            if (activity['activity'] == activityName && 
+                activity['startTime'] == startTime && 
+                activity['endTime'] == endTime) {
+              activity['priority'] = newPriority;
+              break;
             }
           }
-        });
-      }
+        }
+      });
 
+      // Mise à jour en base de données
       final collection = isOptimized ? 'optimized_schedules' : 'user_timetables';
       await FirebaseFirestore.instance
           .collection(collection)
           .doc(user.uid)
           .update(timetableData!);
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Priorité mise à jour avec succès !'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Priorité mise à jour avec succès!'),
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 2),
+        ),
+      );
+
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erreur lors de la mise à jour: $e')),
-        );
-      }
+      print('Erreur lors de la mise à jour de la priorité: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erreur lors de la mise à jour: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 
@@ -824,27 +783,28 @@ class _TimetableViewScreenState extends State<TimetableViewScreen> {
 
   Map<String, ActivityDisplay> _getActivitiesForDay(String day) {
     if (timetableData == null) return {};
-
+    
     final dayData = timetableData![day.toLowerCase()] as List<dynamic>?;
     if (dayData == null) return {};
-
+    
     Map<String, ActivityDisplay> timeSlotActivities = {};
-
+    
     for (var activity in dayData) {
+      print('Activité pour $day: ${activity['activity']}'); // Log pour débogage
       final startTime = _parseTime(activity['startTime']);
       final endTime = _parseTime(activity['endTime']);
-      final activityName = (activity['activity'] ?? '').trim().replaceAll(RegExp(r'\bj\b', caseSensitive: false), '');
+      final activityName = (activity['activity'] ?? '').trim().replaceAll(RegExp(r'\bj\b', caseSensitive: false), ''); // Nettoyer les "j"
       final priority = activity['priority'] ?? 'medium';
-
+      
       if (activityName.isEmpty) continue;
-
+      
       final durationInSlots = ((endTime - startTime) / 30).ceil();
-
+      
       for (int time = startTime; time < endTime; time += 30) {
         final hour = (time ~/ 60).toString().padLeft(2, '0');
         final minute = (time % 60).toString().padLeft(2, '0');
         final timeSlot = '$hour:$minute';
-
+        
         if (time == startTime) {
           timeSlotActivities[timeSlot] = ActivityDisplay(
             name: activityName,
@@ -868,28 +828,28 @@ class _TimetableViewScreenState extends State<TimetableViewScreen> {
         }
       }
     }
-
+    
     return timeSlotActivities;
   }
 
   int _parseTime(String timeString) {
     final parts = timeString.split(':');
-    final hour = int.parse(parts[0]);
+    final hour =int.parse(parts[0]);
     final minute = int.parse(parts[1]);
     return hour * 60 + minute;
   }
 
   Color _getActivityColor(String activity) {
     final hash = activity.hashCode;
-    const colors = [
-      Color(0xFFE0F2F7), // Bleu clair pastel
-      Color(0xFFEBF4E3), // Vert clair pastel
-      Color(0xFFFDE4D0), // Orange clair pastel
-      Color(0xFFEDE7F6), // Violet clair pastel
-      Color(0xFFE0F7FA), // Cyan clair pastel
-      Color(0xFFFCE4EC), // Rose clair pastel
-      Color(0xFFEBE9F6), // Indigo clair pastel
-      Color(0xFFF9FBE7), // Jaune clair pastel
+    final colors = [
+      Colors.blue[200]!,
+      Colors.green[200]!,
+      Colors.orange[200]!,
+      Colors.purple[200]!,
+      Colors.teal[200]!,
+      Colors.pink[200]!,
+      Colors.indigo[200]!,
+      Colors.amber[200]!,
     ];
     return colors[hash.abs() % colors.length];
   }
@@ -899,7 +859,7 @@ class _TimetableViewScreenState extends State<TimetableViewScreen> {
       context: context,
       builder: (BuildContext context) {
         String selectedPriority = activity.priority;
-        final priorityOptions = [
+        final List<Map<String, dynamic>> priorityOptions = [
           {'value': 'low', 'label': 'Pas important', 'color': Colors.green},
           {'value': 'medium', 'label': 'Utile', 'color': Colors.orange},
           {'value': 'high', 'label': 'Très utile', 'color': Colors.red},
@@ -929,7 +889,11 @@ class _TimetableViewScreenState extends State<TimetableViewScreen> {
                       ),
                       child: Text(
                         activity.name,
-                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        textAlign: TextAlign.left,
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -937,11 +901,44 @@ class _TimetableViewScreenState extends State<TimetableViewScreen> {
                       children: [
                         const Icon(Icons.access_time, size: 20),
                         const SizedBox(width: 8),
-                        Text("De ${activity.startTime} à ${activity.endTime}"),
+                        Text(
+                          "De ${activity.startTime} à ${activity.endTime}",
+                          style: const TextStyle(fontSize: 14),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.priority_high,
+                          size: 20,
+                          color: _getPriorityColor(selectedPriority),
+                        ),
+                        const SizedBox(width: 8),
+                        const Text("Importance: ", style: TextStyle(fontWeight: FontWeight.bold)),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: _getPriorityColor(selectedPriority),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            _getPriorityText(selectedPriority),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 16),
-                    const Text("Modifier la priorité", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                    const Text(
+                      "Modifier la priorité",
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                    ),
                     const SizedBox(height: 8),
                     Container(
                       width: double.infinity,
@@ -952,16 +949,14 @@ class _TimetableViewScreenState extends State<TimetableViewScreen> {
                       ),
                       child: DropdownButtonHideUnderline(
                         child: DropdownButton<String>(
-                          value: priorityOptions
-                                  .map((option) => option['value'] as String)
-                                  .contains(selectedPriority)
-                              ? selectedPriority
-                              : 'medium',
+                          value: selectedPriority,
                           icon: const Icon(Icons.arrow_drop_down),
                           isExpanded: true,
                           onChanged: (String? newValue) {
                             if (newValue != null) {
-                              setDialogState(() => selectedPriority = newValue);
+                              setDialogState(() {
+                                selectedPriority = newValue;
+                              });
                               _updateActivityPriority(
                                 activity.day,
                                 activity.name,
@@ -973,19 +968,19 @@ class _TimetableViewScreenState extends State<TimetableViewScreen> {
                           },
                           items: priorityOptions.map<DropdownMenuItem<String>>((option) {
                             return DropdownMenuItem<String>(
-                              value: option['value'] as String,
+                              value: option['value'],
                               child: Row(
                                 children: [
                                   Container(
                                     width: 12,
                                     height: 12,
                                     decoration: BoxDecoration(
-                                      color: option['color'] as Color,
+                                      color: option['color'],
                                       shape: BoxShape.circle,
                                     ),
-                                    margin: const EdgeInsets.only(right: 8),
                                   ),
-                                  Text(option['label'] as String),
+                                  const SizedBox(width: 8),
+                                  Text(option['label']),
                                 ],
                               ),
                             );
@@ -1047,12 +1042,6 @@ class _TimetableViewScreenState extends State<TimetableViewScreen> {
           backgroundColor: Colors.blue[50],
           elevation: 0,
           foregroundColor: Colors.black,
-          leading: Builder(
-            builder: (context) => IconButton(
-              icon: const Icon(Icons.menu),
-              onPressed: () => Scaffold.of(context).openDrawer(),
-            ),
-          ),
         ),
         body: const Center(
           child: Column(
@@ -1074,12 +1063,6 @@ class _TimetableViewScreenState extends State<TimetableViewScreen> {
           backgroundColor: Colors.blue[50],
           elevation: 0,
           foregroundColor: Colors.black,
-          leading: Builder(
-            builder: (context) => IconButton(
-              icon: const Icon(Icons.menu),
-              onPressed: () => Scaffold.of(context).openDrawer(),
-            ),
-          ),
         ),
         body: Center(
           child: Column(
@@ -1107,12 +1090,10 @@ class _TimetableViewScreenState extends State<TimetableViewScreen> {
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
                 onPressed: () {
-                  final homePageState = context.findAncestorStateOfType<_HomePageState>();
-                  if (homePageState != null && mounted) {
-                    homePageState.setState(() {
-                      homePageState._selectedIndex = 1; // TimetableSetupScreen
-                    });
-                  }
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(builder: (_) => const TimetableSetupScreen()),
+                  );
                 },
               ),
             ],
@@ -1122,7 +1103,7 @@ class _TimetableViewScreenState extends State<TimetableViewScreen> {
     }
 
     final timeSlots = _generateTimeSlots();
-    final activities = _getActivitiesForDay(_days[_selectedDayIndex]);
+    final days = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche'];
 
     return Scaffold(
       appBar: AppBar(
@@ -1130,153 +1111,233 @@ class _TimetableViewScreenState extends State<TimetableViewScreen> {
         backgroundColor: Colors.blue[50],
         elevation: 0,
         foregroundColor: Colors.black,
-        leading: Builder(
-          builder: (context) => IconButton(
-            icon: const Icon(Icons.menu),
-            onPressed: () => Scaffold.of(context).openDrawer(),
-          ),
-        ),
-      ),
-      body: Column(
-        children: [
-          // Sélecteur de jour
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: _days.asMap().entries.map((entry) {
-                final index = entry.key;
-                final day = entry.value;
-                return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4.0),
-                  child: ChoiceChip(
-                    label: Text(day),
-                    selected: _selectedDayIndex == index,
-                    onSelected: (selected) {
-                      if (selected && mounted) {
-                        setState(() => _selectedDayIndex = index);
-                      }
-                    },
-                    selectedColor: Colors.blue[100],
-                    backgroundColor: Colors.grey[200],
-                    labelStyle: TextStyle(
-                      color: _selectedDayIndex == index ? Colors.blue[800] : Colors.black,
-                      fontWeight:
-                          _selectedDayIndex == index ? FontWeight.bold : FontWeight.normal,
-                    ),
+        actions: [
+          if (isOptimized)
+            Container(
+              margin: const EdgeInsets.only(right: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.green,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.check_circle, color: Colors.white, size: 16),
+                  SizedBox(width: 4),
+                  Text(
+                    "Optimisé",
+                    style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
                   ),
-                );
-              }).toList(),
-            ),
-          ),
-          const SizedBox(height: 8),
-          // Grille horaire
-          Expanded(
-            child: SingleChildScrollView(
-              child: Column(
-                children: timeSlots.map((time) {
-                  final activity = activities[time];
-                  if (activity == null || !activity.isFirstSlot) {
-                    return activity == null
-                        ? Container(
-                            height: 50,
-                            decoration: BoxDecoration(
-                              border: Border(bottom: BorderSide(color: Colors.grey[200]!)),
-                            ),
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 60,
-                                  padding: const EdgeInsets.all(8.0),
-                                  alignment: Alignment.centerRight,
-                                  child: Text(
-                                    time,
-                                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                                  ),
-                                ),
-                                Expanded(child: Container()),
-                              ],
-                            ),
-                          )
-                        : Container(); // Cases non premières sont vides
-                  }
-
-                  return GestureDetector(
-                    onTap: () => _showActivityDetails(activity),
-                    child: Container(
-                      height: 50.0 * activity.spanCount,
-                      decoration: BoxDecoration(
-                        border: Border(bottom: BorderSide(color: Colors.grey[200]!)),
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 60,
-                            padding: const EdgeInsets.all(8.0),
-                            alignment: Alignment.centerRight,
-                            child: Text(
-                              time,
-                              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                            ),
-                          ),
-                          Expanded(
-                            child: Container(
-                              margin: const EdgeInsets.symmetric(vertical: 2, horizontal: 4),
-                              decoration: BoxDecoration(
-                                color: _getActivityColor(activity.name),
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(
-                                  color: _getPriorityColor(activity.priority),
-                                  width: 2,
-                                ),
-                              ),
-                              padding: const EdgeInsets.all(8.0),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    activity.name,
-                                    style: const TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Row(
-                                    children: [
-                                      Container(
-                                        width: 10,
-                                        height: 10,
-                                        decoration: BoxDecoration(
-                                          color: _getPriorityColor(activity.priority),
-                                          shape: BoxShape.circle,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        _getPriorityText(activity.priority),
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: Colors.grey[700],
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                }).toList(),
+                ],
               ),
             ),
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _loadTimetable,
+            tooltip: "Actualiser",
           ),
         ],
       ),
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Colors.blue[50]!, Colors.white],
+          ),
+        ),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Container(
+            width: MediaQuery.of(context).size.width * 1.8,
+            child: Column(
+              children: [
+                Container(
+                  height: 60,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.grey.withOpacity(0.2),
+                        spreadRadius: 1,
+                        blurRadius: 3,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 80,
+                        padding: const EdgeInsets.all(8),
+                        child: const Text(
+                          "Horaires",
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                      ...days.map((day) => Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            border: Border(
+                              left: BorderSide(color: Colors.grey[300]!, width: 0.5),
+                            ),
+                          ),
+                          child: Text(
+                            day.toUpperCase(),
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      )).toList(),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      children: timeSlots.map((timeSlot) {
+                        return Container(
+                          height: 60,
+                          decoration: BoxDecoration(
+                            border: Border(
+                              bottom: BorderSide(color: Colors.grey[200]!, width: 0.5),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 80,
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: Colors.grey[50],
+                                  border: Border(
+                                    right: BorderSide(color: Colors.grey[300]!, width: 0.5),
+                                  ),
+                                ),
+                                child: Text(
+                                  timeSlot,
+                                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                              ...days.map((day) {
+                                final dayActivities = _getActivitiesForDay(day);
+                                final activity = dayActivities[timeSlot];
+                                
+                                return Expanded(
+                                  child: Material(
+                                    color: Colors.transparent,
+                                    child: InkWell(
+                                      onTap: activity != null ? () {
+                                        print('Clic sur activité: ${activity.name} à $timeSlot pour $day');
+                                        _showActivityDetails(activity);
+                                      } : null,
+                                      highlightColor: Colors.blue.withOpacity(0.2),
+                                      splashColor: Colors.blue.withOpacity(0.3),
+                                      child: Container(
+                                        height: 60,
+                                        margin: const EdgeInsets.all(1),
+                                        decoration: BoxDecoration(
+                                          color: activity != null 
+                                              ? _getActivityColor(activity.name)
+                                              : Colors.transparent,
+                                          borderRadius: activity != null 
+                                              ? BorderRadius.circular(4) 
+                                              : null,
+                                          border: Border.all(
+                                            color: Colors.grey[300]!,
+                                            width: 0.5,
+                                          ),
+                                        ),
+                                        child: activity != null
+                                            ? Container(
+                                                padding: const EdgeInsets.all(2),
+                                                child: Column(
+                                                  mainAxisAlignment: MainAxisAlignment.center,
+                                                  children: [
+                                                    if (activity.isFirstSlot) ...[
+                                                      Text(
+                                                        activity.name,
+                                                        style: const TextStyle(
+                                                          fontSize: 9,
+                                                          fontWeight: FontWeight.bold,
+                                                          color: Colors.black87,
+                                                        ),
+                                                        textAlign: TextAlign.center,
+                                                        maxLines: 3,
+                                                        overflow: TextOverflow.ellipsis,
+                                                      ),
+                                                      const SizedBox(height: 2),
+                                                      Text(
+                                                        "${activity.startTime}-${activity.endTime}",
+                                                        style: const TextStyle(
+                                                          fontSize: 7,
+                                                          color: Colors.black54,
+                                                        ),
+                                                        textAlign: TextAlign.center,
+                                                      ),
+                                                    ] else ...[
+                                                      Container(
+                                                        width: double.infinity,
+                                                        height: 2,
+                                                        color: Colors.black26,
+                                                      ),
+                                                    ],
+                                                  ],
+                                                ),
+                                              )
+                                            : null,
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              }).toList(),
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const TimetableSetupScreen()),
+          );
+        },
+        backgroundColor: Colors.blue,
+        child: const Icon(Icons.edit, color: Colors.white),
+        tooltip: "Modifier l'emploi du temps",
+      ),
     );
   }
+}
+
+class ActivityDisplay {
+  final String name;
+  final bool isFirstSlot;
+  final int spanCount;
+  final String startTime;
+  final String endTime;
+  final String priority;
+  final String day;
+
+  ActivityDisplay({
+    required this.name,
+    required this.isFirstSlot,
+    required this.spanCount,
+    required this.startTime,
+    required this.endTime,
+    required this.priority,
+    required this.day,
+  });
 }

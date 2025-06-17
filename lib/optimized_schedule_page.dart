@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'home_page.dart'; // Importez home_page.dart pour accéder à TimetableSetupScreen si elle n'est pas dans le même fichier
 
 class OptimizedSchedulePage extends StatefulWidget {
   const OptimizedSchedulePage({super.key});
@@ -16,14 +17,28 @@ class _OptimizedSchedulePageState extends State<OptimizedSchedulePage> {
   void initState() {
     super.initState();
     _user = FirebaseAuth.instance.currentUser;
-    // Vous pouvez ajouter ici une logique pour charger les données initiales si nécessaire
   }
 
   @override
   Widget build(BuildContext context) {
+    // Vérification de l'utilisateur non connecté en haut pour une gestion plus propre
     if (_user == null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Emploi du Temps Optimisé')),
+        appBar: AppBar(
+          title: const Text('Emploi du Temps Optimisé'),
+          backgroundColor: Colors.blue[50],
+          elevation: 0,
+          foregroundColor: Colors.black,
+          // Bouton hamburger pour ouvrir le Drawer
+          // Un Builder est nécessaire ici car OptimizedSchedulePage n'est pas un Scaffold direct,
+          // mais est enfant d'un Scaffold (HomePage) qui possède le Drawer.
+          leading: Builder(
+            builder: (context) => IconButton(
+              icon: Icon(Icons.menu),
+              onPressed: () => Scaffold.of(context).openDrawer(), // Ouvre le Drawer du Scaffold parent
+            ),
+          ),
+        ),
         body: const Center(
           child: Text(
             'Veuillez vous connecter pour voir votre emploi du temps optimisé.',
@@ -32,27 +47,34 @@ class _OptimizedSchedulePageState extends State<OptimizedSchedulePage> {
       );
     }
 
-    // Écouter les changements dans Firestore pour l'emploi du temps optimisé de l'utilisateur
     return Scaffold(
-      appBar: AppBar(title: const Text('Emploi du Temps Optimisé')),
+      appBar: AppBar(
+        title: const Text('Emploi du Temps Optimisé'),
+        backgroundColor: Colors.blue[50],
+        elevation: 0,
+        foregroundColor: Colors.black,
+        // Bouton hamburger pour ouvrir le Drawer
+        leading: Builder(
+          builder: (context) => IconButton(
+            icon: Icon(Icons.menu),
+            onPressed: () => Scaffold.of(context).openDrawer(), // Ouvre le Drawer du Scaffold parent
+          ),
+        ),
+      ),
       body: StreamBuilder<DocumentSnapshot>(
-        // Assurez-vous que la collection et le document correspondent à l'endroit où vous stockez l'emploi du temps optimisé
-        // Nous utiliserons l'UID de l'utilisateur comme nom de document
-        stream:
-            FirebaseFirestore.instance
-                .collection('optimized_schedules')
-                .doc(_user!.uid)
-                .snapshots(),
+        stream: FirebaseFirestore.instance
+            .collection('optimized_schedules')
+            .doc(_user!.uid)
+            .snapshots(),
         builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            return Center(child: Text('Erreur de chargement: ${snapshot.error}'));
+          }
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
 
-          if (snapshot.hasError) {
-            return Center(child: Text('Erreur: ${snapshot.error}'));
-          }
-
-          if (!snapshot.hasData || !snapshot.data!.exists) {
+          if (!snapshot.hasData || !snapshot.data!.exists || snapshot.data!.data() == null) {
             return const Center(
               child: Text(
                 'Aucun emploi du temps optimisé trouvé pour le moment.',
@@ -60,8 +82,6 @@ class _OptimizedSchedulePageState extends State<OptimizedSchedulePage> {
             );
           }
 
-          // Les données de l'emploi du temps optimisé sont dans snapshot.data!.data()
-          // Elles devraient être sous forme de Map<String, dynamic>
           final Map<String, dynamic>? data =
               snapshot.data!.data() as Map<String, dynamic>?;
 
@@ -73,19 +93,24 @@ class _OptimizedSchedulePageState extends State<OptimizedSchedulePage> {
             );
           }
 
-          // Construction des lignes du tableau
           final List<DataRow> rows = [];
           data.forEach((jour, activites) {
+            if (jour == '_metadata') return; // Ignorer les métadonnées
+
             if (activites is List) {
               for (var tache in activites) {
+                final String activityName = tache['activity']?.toString() ?? 'N/A';
+                final String startTime = tache['startTime']?.toString() ?? 'N/A';
+                final String endTime = tache['endTime']?.toString() ?? 'N/A';
+
                 rows.add(
                   DataRow(
                     cells: [
                       DataCell(Text(jour[0].toUpperCase() + jour.substring(1))),
                       DataCell(
-                        Text('${tache['startTime']} - ${tache['endTime']}'),
+                        Text('${startTime} - ${endTime}'),
                       ),
-                      DataCell(Text('${tache['activity']}')),
+                      DataCell(Text(activityName)),
                     ],
                   ),
                 );
@@ -108,6 +133,25 @@ class _OptimizedSchedulePageState extends State<OptimizedSchedulePage> {
             ),
           );
         },
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => TimetableSetupScreen(
+                onSubmitted: () {
+                  // Ajoutez ici la logique à exécuter lors de la soumission, par exemple :
+                  Navigator.pop(context);
+                },
+              ),
+            ),
+          );
+        },
+        backgroundColor: Colors.blue,
+        foregroundColor: Colors.white,
+        child: const Icon(Icons.edit, size: 36.0),
+        tooltip: "Modifier l'emploi du temps original",
       ),
     );
   }

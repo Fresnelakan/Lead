@@ -1,10 +1,11 @@
 // android/app/build.gradle
 
 plugins {
-    id "com.android.application"
-    id "kotlin-android"
-    id "dev.flutter.flutter-gradle-plugin"
-    id "com.google.gms.google-services" // IMPORTANT : Ajoutez ou assurez-vous que cette ligne est présente
+    id("com.android.application")
+    id("kotlin-android")
+    // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
+    id("dev.flutter.flutter-gradle-plugin")
+    id("com.google.gms.google-services") version "4.3.15" apply false
 }
 
 android {
@@ -22,14 +23,15 @@ android {
     }
 
     defaultConfig {
-        applicationId "com.example.lead" // IMPORTANT : Doit correspondre à votre nom de package Firebase
-        minSdk flutter.minSdkVersion // Généralement 21 pour la plupart des apps Flutter/Firebase
-        targetSdk flutter.targetSdkVersion // Ou une version stable comme 34 si vous préférez
-
-        versionCode flutter.versionCode
-        versionName flutter.versionName
-
-        multiDexEnabled true // Crucial pour les applications avec beaucoup de dépendances comme Firebase
+        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
+        applicationId = "com.example.lead"
+        // You can update the following values to match your application needs.
+        // For more information, see: https://flutter.dev/to/review-gradle-config.
+        minSdk = 23
+        targetSdk = flutter.targetSdkVersion
+        versionCode = flutter.versionCode.toInteger()
+        versionName = flutter.versionName
+        minSdkVersion(23)
     }
 
     buildTypes {
@@ -46,28 +48,14 @@ flutter {
 }
 
 dependencies {
-    // Importe la BOM (Bill of Materials) Firebase pour gérer les versions de vos dépendances Firebase.
-    // Utilisez la dernière version stable.
-    implementation platform('com.google.firebase:firebase-bom:32.7.4') // Vérifiez la dernière version sur firebase.google.com/docs/android/setup
+    // Import the Firebase BoM
+    implementation(platform("com.google.firebase:firebase-bom:33.12.0"))
+    implementation("com.google.firebase:firebase-auth-ktx")
+    implementation("com.google.android.gms:play-services-auth:21.1.1") 
 
-    // Dépendances Firebase que vous utilisez. Assurez-vous que celles-ci sont ici.
-    implementation 'com.google.firebase:firebase-analytics'
-    implementation 'com.google.firebase:firebase-auth'
-    implementation 'com.google.firebase:firebase-firestore'
-    implementation 'com.google.firebase:firebase-messaging'
 
-    // Dépendance pour MultiDex
-    implementation 'androidx.multidex:multidex:2.0.1'
-
-    // Assurez-vous que ces lignes sont bien à la fin des dépendances si elles existent déjà
-    implementation flutter.embeddedInAar ? {
-        def jarFile = flutter.findJar('flutter-x.jar')
-        if (jarFile == null) {
-            jarFile = flutter.findJar('flutter-x.x.x.jar')
-        }
-        if (jarFile == null) {
-            return []
-        }
-        return files(jarFile)
-    } : []
+    // TODO: Add the dependencies for Firebase products you want to use
+    // When using the BoM, don't specify versions in Firebase dependencies
+    // https://firebase.google.com/docs/android/setup#available-libraries
 }
+apply(plugin = "com.google.gms.google-services")

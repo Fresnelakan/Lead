@@ -10,7 +10,12 @@ class NotificationsPage extends StatefulWidget {
 }
 
 class _NotificationsPageState extends State<NotificationsPage> {
-  // Fonction pour extraire et filtrer les activités
+  @override
+  void initState() {
+    super.initState();
+  }
+
+  // Fonction utilitaire pour extraire et aplatir les activités du planning
   List<Map<String, dynamic>> _extractAndFilterActivities(
       Map<String, dynamic> scheduleData) {
     List<Map<String, dynamic>> upcomingActivities = [];
@@ -28,24 +33,16 @@ class _NotificationsPageState extends State<NotificationsPage> {
               final int hour = int.parse(timeParts[0]);
               final int minute = int.parse(timeParts[1]);
 
-              // Associer le jour à une date future si nécessaire
               int dayIndex = _getDayIndex(day.toLowerCase());
-              DateTime activityDateTime = DateTime(
-                now.year,
-                now.month,
-                now.day + (dayIndex >= now.weekday ? dayIndex - now.weekday : 7 - now.weekday + dayIndex),
-                hour,
-                minute,
-              );
+              DateTime activityDateTime = _getNextWeekdayDateTime(dayIndex, hour, minute);
 
-              // Ignorer les activités passées
               if (activityDateTime.isBefore(now)) {
                 continue;
               }
 
               upcomingActivities.add({
                 'activity': activity['activity'],
-                'startTime': activityDateTime,
+                'startTime': activityDateTime, // Maintenant un objet DateTime
                 'endTime': activity['endTime'],
                 'day': day,
               });
@@ -57,14 +54,12 @@ class _NotificationsPageState extends State<NotificationsPage> {
       }
     });
 
-    // Trier les activités par heure de début
     upcomingActivities.sort((a, b) => (a['startTime'] as DateTime)
         .compareTo(b['startTime'] as DateTime));
 
     return upcomingActivities;
   }
 
-  // Convertir le nom du jour en index (lundi=1, ..., dimanche=7)
   int _getDayIndex(String day) {
     switch (day.toLowerCase()) {
       case 'lundi':
@@ -82,22 +77,61 @@ class _NotificationsPageState extends State<NotificationsPage> {
       case 'dimanche':
         return 7;
       default:
-        return 1; // Par défaut, lundi
+        return 1;
     }
   }
 
-  // Fonction pour planifier une notification push via une Cloud Function
-  Future<void> _schedulePushNotification(Map<String, dynamic> activity) async {
+  DateTime _getNextWeekdayDateTime(int targetWeekday, int hour, int minute) {
+    DateTime now = DateTime.now();
+    int daysToAdd = targetWeekday - now.weekday;
+    if (daysToAdd <= 0) {
+      daysToAdd += 7;
+    }
+
+    DateTime nextActivityDate = DateTime(
+      now.year,
+      now.month,
+      now.day + daysToAdd,
+      hour,
+      minute,
+    );
+
+    if (nextActivityDate.isBefore(now) && nextActivityDate.weekday == now.weekday) {
+      nextActivityDate = nextActivityDate.add(const Duration(days: 7));
+    }
+
+    return nextActivityDate;
+  }
+
+  // Fonction pour planifier une demande de notification push en écrivant dans Firestore
+  Future<void> _schedulePushNotificationRequest(Map<String, dynamic> activity) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
-    final notificationTime = (activity['startTime'] as DateTime).subtract(Duration(minutes: 3));
-    if (notificationTime.isBefore(DateTime.now())) return;
+    final notificationTime = (activity['startTime'] as DateTime).subtract(const Duration(minutes: 3));
 
-    // Stocker les détails de la notification dans Firestore
+    if (notificationTime.isBefore(DateTime.now())) {
+      print('Notification pour ${activity['activity']} déjà passée. Non planifiée.');
+      return;
+    }
+
+    final notificationRequestId = '${user.uid}-${activity['startTime'].millisecondsSinceEpoch}-${activity['activity'].hashCode}';
+
+    final existingNotificationDocs = await FirebaseFirestore.instance
+        .collection('notifications')
+        .where('userId', isEqualTo: user.uid)
+        .where('activityId', isEqualTo: activity['startTime'].hashCode.toString())
+        .where('scheduledTime', isEqualTo: Timestamp.fromDate(notificationTime))
+        .get();
+
+    if (existingNotificationDocs.docs.isNotEmpty) {
+      print('Demande de notification pour ${activity['activity']} existe déjà. Pas de doublon.');
+      return;
+    }
+
     await FirebaseFirestore.instance
         .collection('notifications')
-        .doc()
+        .doc(notificationRequestId)
         .set({
       'userId': user.uid,
       'title': 'Rappel : ${activity['activity']}',
@@ -106,6 +140,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
       'activityId': activity['startTime'].hashCode.toString(),
       'delivered': false,
     });
+    print('Demande de notification pour ${activity['activity']} planifiée dans Firestore.');
   }
 
   @override
@@ -114,13 +149,37 @@ class _NotificationsPageState extends State<NotificationsPage> {
 
     if (user == null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Notifications')),
+        appBar: AppBar(
+          title: const Text('Notifications'),
+          backgroundColor: Colors.blue[50],
+          elevation: 0,
+          foregroundColor: Colors.black,
+          // Bouton hamburger pour ouvrir le Drawer
+          leading: Builder(
+            builder: (context) => IconButton(
+              icon: Icon(Icons.menu),
+              onPressed: () => Scaffold.of(context).openDrawer(),
+            ),
+          ),
+        ),
         body: const Center(child: Text('Veuillez vous connecter')),
       );
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Notifications')),
+      appBar: AppBar(
+        title: const Text('Notifications'),
+        backgroundColor: Colors.blue[50],
+        elevation: 0,
+        foregroundColor: Colors.black,
+        // Bouton hamburger pour ouvrir le Drawer
+        leading: Builder(
+          builder: (context) => IconButton(
+            icon: Icon(Icons.menu),
+            onPressed: () => Scaffold.of(context).openDrawer(),
+          ),
+        ),
+      ),
       body: StreamBuilder<DocumentSnapshot>(
         stream: FirebaseFirestore.instance
             .collection('optimized_schedules')
@@ -135,23 +194,22 @@ class _NotificationsPageState extends State<NotificationsPage> {
           }
 
           if (!snapshot.hasData || !snapshot.data!.exists || snapshot.data!.data() == null) {
-            return const Center(child: Text('Aucun emploi du temps optimisé trouvé.'));
+            return const Center(child: Text('Aucune activité à venir')); // Texte mis à jour pour plus de clarté
           }
 
           final Map<String, dynamic>? rawScheduleData =
               snapshot.data!.data() as Map<String, dynamic>?;
 
           if (rawScheduleData == null || rawScheduleData.isEmpty) {
-            return const Center(child: Text('Aucun emploi du temps optimisé trouvé.'));
+            return const Center(child: Text('Aucune activité à venir'));
           }
 
-          // Extraire et filtrer les activités
           final List<Map<String, dynamic>> activities =
               _extractAndFilterActivities(rawScheduleData);
 
-          // Planifier les notifications push pour chaque activité
+          // Planifier les demandes de notifications push pour chaque activité à venir
           for (var activity in activities) {
-            _schedulePushNotification(activity);
+            _schedulePushNotificationRequest(activity);
           }
 
           if (activities.isEmpty) {

@@ -75,7 +75,7 @@ Pour exécuter le projet dans l'environnement de développement local, vous aure
 1.  **Démarrez les émulateurs Firebase :**
     Dans le terminal, depuis la racine de votre projet, lancez les émulateurs nécessaires.
     ```bash
-    firebase emulators:start --only "functions,firestore,auth,ui" --debug
+    
     ```
     Laissez ce terminal ouvert. L'adresse de l'interface utilisateur des émulateurs est généralement `http://localhost:4000`. Vous pouvez l'ouvrir dans votre navigateur pour visualiser les données Firestore, les logs des fonctions, etc.
 
