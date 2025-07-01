@@ -65,6 +65,7 @@ class _TimetableSetupScreenState extends State<TimetableSetupScreen> {
   final List<List<TimeSlot>> _timeSlots = List.generate(7, (_) => []);
   final Set<int> _errorIndexes = {};
 
+  // Fonction pour formater l'heure au format 24h
   String _formatTimeTo24Hour(TimeOfDay time) {
     final hour = time.hour.toString().padLeft(2, '0');
     final minute = time.minute.toString().padLeft(2, '0');
@@ -73,7 +74,8 @@ class _TimetableSetupScreenState extends State<TimetableSetupScreen> {
 
   void _addTimeSlot() {
     final slots = _timeSlots[_currentDayIndex];
-
+    
+    // Vérifier que la tâche précédente est remplie
     if (slots.isNotEmpty && slots.last.activity.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -85,6 +87,7 @@ class _TimetableSetupScreenState extends State<TimetableSetupScreen> {
       return;
     }
 
+    // Vérifier que l'heure de fin > heure de début
     if (slots.isNotEmpty && !_isEndAfterStart(slots.last.startTime, slots.last.endTime)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -100,11 +103,13 @@ class _TimetableSetupScreenState extends State<TimetableSetupScreen> {
     if (slots.isNotEmpty) {
       start = slots.last.endTime;
     }
-
+    
     setState(() {
       slots.add(TimeSlot()
         ..startTime = start
-        ..endTime = start);
+        ..endTime = start
+        ..priority = 'medium' // Priorité par défaut
+      );
       _errorIndexes.clear();
     });
   }
@@ -189,6 +194,7 @@ class _TimetableSetupScreenState extends State<TimetableSetupScreen> {
             'endTime': _formatTimeTo24Hour(timeSlot.endTime),
             'activity': timeSlot.activity,
             'type': 'course',
+            'priority': timeSlot.priority, // Utiliser la priorité définie par l'utilisateur
           });
         }
       }
@@ -304,6 +310,11 @@ class _TimetableSetupScreenState extends State<TimetableSetupScreen> {
                           error: _errorIndexes.contains(index),
                           onRemove: () => _removeTimeSlot(index),
                           index: index,
+                          onPriorityChanged: (newPriority) {
+                            setState(() {
+                              _timeSlots[_currentDayIndex][index].priority = newPriority;
+                            });
+                          },
                         ),
                       ),
               ),
@@ -355,6 +366,7 @@ class TimeSlot {
   TimeOfDay startTime = TimeOfDay.now();
   TimeOfDay endTime = TimeOfDay.now();
   String activity = '';
+  String priority = 'medium'; // Nouvelle propriété pour la priorité
 }
 
 class TimeSlotEntry extends StatefulWidget {
@@ -362,6 +374,7 @@ class TimeSlotEntry extends StatefulWidget {
   final bool error;
   final VoidCallback onRemove;
   final int index;
+  final Function(String) onPriorityChanged;
 
   const TimeSlotEntry({
     super.key,
@@ -369,6 +382,7 @@ class TimeSlotEntry extends StatefulWidget {
     this.error = false,
     required this.onRemove,
     required this.index,
+    required this.onPriorityChanged,
   });
 
   @override
@@ -379,6 +393,13 @@ class _TimeSlotEntryState extends State<TimeSlotEntry> with SingleTickerProvider
   late AnimationController _controller;
   late Animation<Color?> _colorAnimation;
   late TextEditingController _textController;
+
+  // Options de priorité disponibles
+  final List<Map<String, dynamic>> _priorityOptions = [
+    {'value': 'low', 'label': 'Pas important', 'color': Colors.green},
+    {'value': 'medium', 'label': 'Utile', 'color': Colors.orange},
+    {'value': 'high', 'label': 'Très utile', 'color': Colors.red},
+  ];
 
   @override
   void initState() {
@@ -413,6 +434,22 @@ class _TimeSlotEntryState extends State<TimeSlotEntry> with SingleTickerProvider
     _controller.dispose();
     _textController.dispose();
     super.dispose();
+  }
+
+  Color _getPriorityColor(String priority) {
+    final option = _priorityOptions.firstWhere(
+      (p) => p['value'] == priority,
+      orElse: () => _priorityOptions[1], // medium par défaut
+    );
+    return option['color'];
+  }
+
+  String _getPriorityLabel(String priority) {
+    final option = _priorityOptions.firstWhere(
+      (p) => p['value'] == priority,
+      orElse: () => _priorityOptions[1], // medium par défaut
+    );
+    return option['label'];
   }
 
   @override
@@ -453,6 +490,22 @@ class _TimeSlotEntryState extends State<TimeSlotEntry> with SingleTickerProvider
                       ),
                     ),
                     const Spacer(),
+                    // Indicateur de priorité
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: _getPriorityColor(widget.timeSlot.priority),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        _getPriorityLabel(widget.timeSlot.priority),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
                     const SizedBox(width: 8),
                     IconButton(
                       icon: const Icon(Icons.delete_outline, color: Colors.red),
@@ -548,6 +601,57 @@ class _TimeSlotEntryState extends State<TimeSlotEntry> with SingleTickerProvider
                   ),
                   onChanged: (value) => widget.timeSlot.activity = value,
                 ),
+                const SizedBox(height: 16),
+                // Sélecteur de priorité
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      "Importance de la tâche",
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey[300]!),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          value: widget.timeSlot.priority,
+                          icon: const Icon(Icons.arrow_drop_down),
+                          isExpanded: true,
+                          onChanged: (String? newValue) {
+                            if (newValue != null) {
+                              widget.onPriorityChanged(newValue);
+                            }
+                          },
+                          items: _priorityOptions.map<DropdownMenuItem<String>>((option) {
+                            return DropdownMenuItem<String>(
+                              value: option['value'],
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 12,
+                                    height: 12,
+                                    decoration: BoxDecoration(
+                                      color: option['color'],
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(option['label']),
+                                ],
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ],
             ),
           ),
@@ -621,17 +725,19 @@ class _TimetableViewScreenState extends State<TimetableViewScreen> {
     }
   }
 
+  // Nouvelle méthode pour mettre à jour la priorité d'une activité
   Future<void> _updateActivityPriority(String day, String activityName, String startTime, String endTime, String newPriority) async {
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) return;
 
+      // Mise à jour locale
       setState(() {
         final dayData = timetableData![day.toLowerCase()] as List<dynamic>?;
         if (dayData != null) {
           for (var activity in dayData) {
-            if (activity['activity'] == activityName &&
-                activity['startTime'] == startTime &&
+            if (activity['activity'] == activityName && 
+                activity['startTime'] == startTime && 
                 activity['endTime'] == endTime) {
               activity['priority'] = newPriority;
               break;
@@ -640,6 +746,7 @@ class _TimetableViewScreenState extends State<TimetableViewScreen> {
         }
       });
 
+      // Mise à jour en base de données
       final collection = isOptimized ? 'optimized_schedules' : 'user_timetables';
       await FirebaseFirestore.instance
           .collection(collection)
@@ -648,11 +755,12 @@ class _TimetableViewScreenState extends State<TimetableViewScreen> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Priorité mise à jour avec succès !'),
+          content: Text('Priorité mise à jour avec succès!'),
           backgroundColor: Colors.green,
           duration: Duration(seconds: 2),
         ),
       );
+
     } catch (e) {
       print('Erreur lors de la mise à jour de la priorité: $e');
       ScaffoldMessenger.of(context).showSnackBar(
@@ -675,28 +783,28 @@ class _TimetableViewScreenState extends State<TimetableViewScreen> {
 
   Map<String, ActivityDisplay> _getActivitiesForDay(String day) {
     if (timetableData == null) return {};
-
+    
     final dayData = timetableData![day.toLowerCase()] as List<dynamic>?;
     if (dayData == null) return {};
-
+    
     Map<String, ActivityDisplay> timeSlotActivities = {};
-
+    
     for (var activity in dayData) {
-      print('Activité pour $day: ${activity['activity']}');
+      print('Activité pour $day: ${activity['activity']}'); // Log pour débogage
       final startTime = _parseTime(activity['startTime']);
       final endTime = _parseTime(activity['endTime']);
-      final activityName = (activity['activity'] ?? '').trim().replaceAll(RegExp(r'\bj\b', caseSensitive: false), '');
+      final activityName = (activity['activity'] ?? '').trim().replaceAll(RegExp(r'\bj\b', caseSensitive: false), ''); // Nettoyer les "j"
       final priority = activity['priority'] ?? 'medium';
-
+      
       if (activityName.isEmpty) continue;
-
+      
       final durationInSlots = ((endTime - startTime) / 30).ceil();
-
+      
       for (int time = startTime; time < endTime; time += 30) {
         final hour = (time ~/ 60).toString().padLeft(2, '0');
         final minute = (time % 60).toString().padLeft(2, '0');
         final timeSlot = '$hour:$minute';
-
+        
         if (time == startTime) {
           timeSlotActivities[timeSlot] = ActivityDisplay(
             name: activityName,
@@ -720,13 +828,13 @@ class _TimetableViewScreenState extends State<TimetableViewScreen> {
         }
       }
     }
-
+    
     return timeSlotActivities;
   }
 
   int _parseTime(String timeString) {
     final parts = timeString.split(':');
-    final hour = int.parse(parts[0]);
+    final hour =int.parse(parts[0]);
     final minute = int.parse(parts[1]);
     return hour * 60 + minute;
   }
@@ -734,14 +842,14 @@ class _TimetableViewScreenState extends State<TimetableViewScreen> {
   Color _getActivityColor(String activity) {
     final hash = activity.hashCode;
     final colors = [
-      const Color(0xFFE0F2F7), // Bleu clair pastel
-      const Color(0xFFEBF4E3), // Vert clair pastel
-      const Color(0xFFFDE4D0), // Orange clair pastel
-      const Color(0xFFEDE7F6), // Violet clair pastel
-      const Color(0xFFE0F7FA), // Cyan clair pastel
-      const Color(0xFFFCE4EC), // Rose clair pastel
-      const Color(0xFFEBE9F6), // Indigo clair pastel
-      const Color(0xFFF9FBE7), // Jaune clair pastel
+      Colors.blue[200]!,
+      Colors.green[200]!,
+      Colors.orange[200]!,
+      Colors.purple[200]!,
+      Colors.teal[200]!,
+      Colors.pink[200]!,
+      Colors.indigo[200]!,
+      Colors.amber[200]!,
     ];
     return colors[hash.abs() % colors.length];
   }
@@ -799,6 +907,33 @@ class _TimetableViewScreenState extends State<TimetableViewScreen> {
                         ),
                       ],
                     ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.priority_high,
+                          size: 20,
+                          color: _getPriorityColor(selectedPriority),
+                        ),
+                        const SizedBox(width: 8),
+                        const Text("Importance: ", style: TextStyle(fontWeight: FontWeight.bold)),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: _getPriorityColor(selectedPriority),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            _getPriorityText(selectedPriority),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                     const SizedBox(height: 16),
                     const Text(
                       "Modifier la priorité",
@@ -814,11 +949,7 @@ class _TimetableViewScreenState extends State<TimetableViewScreen> {
                       ),
                       child: DropdownButtonHideUnderline(
                         child: DropdownButton<String>(
-                          value: priorityOptions
-                              .map((option) => option['value'] as String)
-                              .contains(selectedPriority)
-                              ? selectedPriority
-                              : 'medium',
+                          value: selectedPriority,
                           icon: const Icon(Icons.arrow_drop_down),
                           isExpanded: true,
                           onChanged: (String? newValue) {
@@ -1047,21 +1178,20 @@ class _TimetableViewScreenState extends State<TimetableViewScreen> {
                         ),
                       ),
                       ...days.map((day) => Expanded(
-                            child: Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                border: Border(
-                                  left: BorderSide(color: Colors.grey[300]!, width: 0.5),
-                                ),
-                              ),
-                              child: Text(
-                                day.toUpperCase(),
-                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-                                textAlign: TextAlign.center,
-                              ),
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            border: Border(
+                              left: BorderSide(color: Colors.grey[300]!, width: 0.5),
                             ),
-                          ))
-                          .toList(),
+                          ),
+                          child: Text(
+                            day.toUpperCase(),
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      )).toList(),
                     ],
                   ),
                 ),
@@ -1096,25 +1226,27 @@ class _TimetableViewScreenState extends State<TimetableViewScreen> {
                               ...days.map((day) {
                                 final dayActivities = _getActivitiesForDay(day);
                                 final activity = dayActivities[timeSlot];
-
+                                
                                 return Expanded(
                                   child: Material(
                                     color: Colors.transparent,
                                     child: InkWell(
-                                      onTap: activity != null
-                                          ? () {
-                                              print('Clic sur activité: ${activity.name} à $timeSlot pour $day');
-                                              _showActivityDetails(activity);
-                                            }
-                                          : null,
+                                      onTap: activity != null ? () {
+                                        print('Clic sur activité: ${activity.name} à $timeSlot pour $day');
+                                        _showActivityDetails(activity);
+                                      } : null,
                                       highlightColor: Colors.blue.withOpacity(0.2),
                                       splashColor: Colors.blue.withOpacity(0.3),
                                       child: Container(
                                         height: 60,
                                         margin: const EdgeInsets.all(1),
                                         decoration: BoxDecoration(
-                                          color: activity != null ? _getActivityColor(activity.name) : Colors.transparent,
-                                          borderRadius: activity != null ? BorderRadius.circular(4) : null,
+                                          color: activity != null 
+                                              ? _getActivityColor(activity.name)
+                                              : Colors.transparent,
+                                          borderRadius: activity != null 
+                                              ? BorderRadius.circular(4) 
+                                              : null,
                                           border: Border.all(
                                             color: Colors.grey[300]!,
                                             width: 0.5,
