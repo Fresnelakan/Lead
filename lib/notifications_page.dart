@@ -28,6 +28,18 @@ class _NotificationsPageState extends State<NotificationsPage> {
               activity['startTime'] != null &&
               activity['endTime'] != null) {
             try {
+              // Assurez-vous que le champ 'priority' ou 'importance' existe dans vos données Firestore
+              // Si ce champ n'existe pas, toutes les activités seront considérées non-pertinentes pour la notification ici.
+              // Pour la démo, si le champ n'est pas encore là, vous pouvez le mocker ou assumer une valeur par défaut.
+              // Exemple: Si vous n'avez pas de 'priority', ajoutez || true pour inclure toutes les activités pour la démo.
+              final String? priority = activity['priority'] as String?; // Supposons un champ 'priority'
+
+              // NE PLANIFIER QUE SI L'ACTIVITÉ EST "utile" OU "très utile"
+              // Correct (pour le JSON IA)
+              if (priority == null || (priority != 'high' && priority != 'essential')) {
+                continue;
+              }
+
               final String timeString = activity['startTime']; // Ex: "09:00"
               final List<String> timeParts = timeString.split(':');
               final int hour = int.parse(timeParts[0]);
@@ -36,6 +48,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
               int dayIndex = _getDayIndex(day.toLowerCase());
               DateTime activityDateTime = _getNextWeekdayDateTime(dayIndex, hour, minute);
 
+              // Ne pas inclure les activités passées
               if (activityDateTime.isBefore(now)) {
                 continue;
               }
@@ -45,6 +58,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
                 'startTime': activityDateTime, // Maintenant un objet DateTime
                 'endTime': activity['endTime'],
                 'day': day,
+                'priority': priority, // Ajoute la propriété d'utilité pour l'affichage si besoin
               });
             } catch (e) {
               print('Erreur de parsing de l\'activité: $activity, Erreur: $e');
@@ -77,14 +91,17 @@ class _NotificationsPageState extends State<NotificationsPage> {
       case 'dimanche':
         return 7;
       default:
-        return 1;
+        return 1; // Par défaut Lundi
     }
   }
 
   DateTime _getNextWeekdayDateTime(int targetWeekday, int hour, int minute) {
     DateTime now = DateTime.now();
     int daysToAdd = targetWeekday - now.weekday;
-    if (daysToAdd <= 0) {
+    if (daysToAdd < 0) { // Si le jour cible est déjà passé cette semaine
+      daysToAdd += 7;
+    } else if (daysToAdd == 0 && (now.hour > hour || (now.hour == hour && now.minute >= minute))) {
+      // Si c'est le même jour mais l'heure est déjà passée ou actuelle
       daysToAdd += 7;
     }
 
@@ -95,11 +112,6 @@ class _NotificationsPageState extends State<NotificationsPage> {
       hour,
       minute,
     );
-
-    if (nextActivityDate.isBefore(now) && nextActivityDate.weekday == now.weekday) {
-      nextActivityDate = nextActivityDate.add(const Duration(days: 7));
-    }
-
     return nextActivityDate;
   }
 
@@ -108,6 +120,13 @@ class _NotificationsPageState extends State<NotificationsPage> {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
+    // Le filtre est déjà fait dans _extractAndFilterActivities, mais on peut vérifier à nouveau
+    final String? priority = activity['priority'] as String?;
+    if (priority == null || (priority != 'utile' && priority != 'très utile')) {
+      print('Activité ${activity['activity']} non "utile" ou "très utile". Notification non planifiée.');
+      return; // Ne planifie pas si l'utilité n'est pas "utile" ou "très utile"
+    }
+
     final notificationTime = (activity['startTime'] as DateTime).subtract(const Duration(minutes: 3));
 
     if (notificationTime.isBefore(DateTime.now())) {
@@ -115,32 +134,34 @@ class _NotificationsPageState extends State<NotificationsPage> {
       return;
     }
 
-    final notificationRequestId = '${user.uid}-${activity['startTime'].millisecondsSinceEpoch}-${activity['activity'].hashCode}';
+    // Un ID unique pour éviter les doublons dans Firestore
+    final notificationRequestId = '${user.uid}-${activity['activity']}-${notificationTime.toIso8601String()}';
 
-    final existingNotificationDocs = await FirebaseFirestore.instance
-        .collection('notifications')
-        .where('userId', isEqualTo: user.uid)
-        .where('activityId', isEqualTo: activity['startTime'].hashCode.toString())
-        .where('scheduledTime', isEqualTo: Timestamp.fromDate(notificationTime))
+    // Vérifier si cette notification a déjà été planifiée
+    final existingNotificationDoc = await FirebaseFirestore.instance
+        .collection('notification_requests') // Utiliser une collection dédiée aux requêtes
+        .doc(notificationRequestId)
         .get();
 
-    if (existingNotificationDocs.docs.isNotEmpty) {
+    if (existingNotificationDoc.exists) {
       print('Demande de notification pour ${activity['activity']} existe déjà. Pas de doublon.');
       return;
     }
 
     await FirebaseFirestore.instance
-        .collection('notifications')
+        .collection('notification_requests') // Collection pour stocker les requêtes de notifications
         .doc(notificationRequestId)
         .set({
-      'userId': user.uid,
-      'title': 'Rappel : ${activity['activity']}',
-      'body': 'Votre activité "${activity['activity']}" commence à ${activity['startTime'].toLocal().toString().substring(11, 16)}.',
-      'scheduledTime': Timestamp.fromDate(notificationTime),
-      'activityId': activity['startTime'].hashCode.toString(),
-      'delivered': false,
-    });
-    print('Demande de notification pour ${activity['activity']} planifiée dans Firestore.');
+          'userId': user.uid,
+          'activityName': activity['activity'],
+          'scheduledTime': Timestamp.fromDate(notificationTime),
+          'title': 'Rappel : ${activity['activity']}',
+          'body': 'Votre activité "${activity['activity']}" commence à ${activity['startTime'].toLocal().toString().substring(11, 16)}.',
+          'originalActivityStartTime': Timestamp.fromDate(activity['startTime']),
+          'status': 'pending', // 'pending', 'sent', 'failed'
+          'type': priority, // Garder le type d'utilité pour le contexte
+        });
+    print('Demande de notification pour ${activity['activity']} planifiée dans Firestore (utilité: $priority).');
   }
 
   @override
@@ -154,28 +175,26 @@ class _NotificationsPageState extends State<NotificationsPage> {
           backgroundColor: Colors.blue[50],
           elevation: 0,
           foregroundColor: Colors.black,
-          // Bouton hamburger pour ouvrir le Drawer
           leading: Builder(
             builder: (context) => IconButton(
-              icon: Icon(Icons.menu),
+              icon: const Icon(Icons.menu),
               onPressed: () => Scaffold.of(context).openDrawer(),
             ),
           ),
         ),
-        body: const Center(child: Text('Veuillez vous connecter')),
+        body: const Center(child: Text('Veuillez vous connecter pour voir vos notifications.')),
       );
     }
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Notifications'),
+        title: const Text('Notifications pertinentes'), // Titre plus spécifique
         backgroundColor: Colors.blue[50],
         elevation: 0,
         foregroundColor: Colors.black,
-        // Bouton hamburger pour ouvrir le Drawer
         leading: Builder(
           builder: (context) => IconButton(
-            icon: Icon(Icons.menu),
+            icon: const Icon(Icons.menu),
             onPressed: () => Scaffold.of(context).openDrawer(),
           ),
         ),
@@ -183,49 +202,112 @@ class _NotificationsPageState extends State<NotificationsPage> {
       body: StreamBuilder<DocumentSnapshot>(
         stream: FirebaseFirestore.instance
             .collection('optimized_schedules')
-            .doc(user.uid)
+            .doc(user.uid) // Assurez-vous que l'emploi du temps optimisé est stocké par UID de l'utilisateur
             .snapshots(),
         builder: (context, snapshot) {
           if (snapshot.hasError) {
-            return Center(child: Text('Erreur de chargement: ${snapshot.error}'));
+            return Center(child: Text('Erreur de chargement des notifications: ${snapshot.error}'));
           }
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
 
           if (!snapshot.hasData || !snapshot.data!.exists || snapshot.data!.data() == null) {
-            return const Center(child: Text('Aucune activité à venir')); // Texte mis à jour pour plus de clarté
+            return const Center(
+              child: Padding(
+                padding: EdgeInsets.all(16.0),
+                child: Text(
+                  'Aucun emploi du temps optimisé trouvé ou aucune activité pertinente à notifier.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 16, color: Colors.grey),
+                ),
+              ),
+            );
           }
 
           final Map<String, dynamic>? rawScheduleData =
               snapshot.data!.data() as Map<String, dynamic>?;
 
           if (rawScheduleData == null || rawScheduleData.isEmpty) {
-            return const Center(child: Text('Aucune activité à venir'));
+            return const Center(child: Text('Aucune activité à notifier.'));
           }
 
-          final List<Map<String, dynamic>> activities =
+          // Extrait et filtre les activités basées sur "utile" ou "très utile"
+          final List<Map<String, dynamic>> activitiesToNotify =
               _extractAndFilterActivities(rawScheduleData);
 
-          // Planifier les demandes de notifications push pour chaque activité à venir
-          for (var activity in activities) {
+          // Planifier les demandes de notifications push pour CHAQUE activité filtrée
+          // Ceci se déclenchera à chaque fois que le StreamBuilder reçoit une mise à jour.
+          // C'est pourquoi la logique de dédoublonnage dans _schedulePushNotificationRequest est importante.
+          for (var activity in activitiesToNotify) {
             _schedulePushNotificationRequest(activity);
           }
 
-          if (activities.isEmpty) {
-            return const Center(child: Text('Aucune activité à venir'));
+          if (activitiesToNotify.isEmpty) {
+            return const Center(
+              child: Padding(
+                padding: EdgeInsets.all(16.0),
+                child: Text(
+                  'Aucune notification pertinente pour le moment. '
+                  'Les notifications s\'affichent uniquement pour les activités jugées "utile" ou "très utile".',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 16, color: Colors.grey),
+                ),
+              ),
+            );
           }
 
           return ListView.builder(
-            itemCount: activities.length,
+            itemCount: activitiesToNotify.length,
             itemBuilder: (context, index) {
-              final activity = activities[index];
+              final activity = activitiesToNotify[index];
               final DateTime startTime = activity['startTime'] as DateTime;
+              final String priority = activity['priority'] as String? ?? 'Non spécifié';
 
-              return ListTile(
-                title: Text(activity['activity']),
-                subtitle: Text('Début : ${startTime.toLocal().toString().substring(0, 16)}'),
-                trailing: const Icon(Icons.notifications_active),
+              // Calcul du temps restant avant la notification (3 min avant le début)
+              final DateTime notificationTime = startTime.subtract(const Duration(minutes: 3));
+              final Duration timeLeft = notificationTime.difference(DateTime.now());
+
+              String timeLeftText;
+              if (timeLeft.isNegative) {
+                timeLeftText = "Notification déjà envoyée";
+              } else if (timeLeft.inHours > 0) {
+                timeLeftText = "Notification dans ${timeLeft.inHours}h ${timeLeft.inMinutes % 60}min";
+              } else {
+                timeLeftText = "Notification dans ${timeLeft.inMinutes}min";
+              }
+
+              return Card(
+                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                elevation: 2,
+                child: ListTile(
+                  leading: Icon(
+                    priority == 'high' ? Icons.star : Icons.check_circle,
+                    color: priority == 'high' ? Colors.amber : Colors.blue,
+                  ),
+                  title: Text(
+                    activity['activity'],
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Début : ${startTime.toLocal().toString().substring(0, 16)}',
+                      ),
+                      Text(
+                        'Priorité: ${priority == 'high' ? 'Très utile' : priority == 'essential' ? 'Essentielle' : priority}',
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        timeLeftText,
+                        style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                  trailing: const Icon(Icons.notifications_active, color: Colors.green),
+                  isThreeLine: true,
+                ),
               );
             },
           );

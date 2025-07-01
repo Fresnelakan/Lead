@@ -14,21 +14,66 @@ class OptimizedSchedulePage extends StatefulWidget {
   State<OptimizedSchedulePage> createState() => _OptimizedSchedulePageState();
 }
 
+
 class _OptimizedSchedulePageState extends State<OptimizedSchedulePage> {
   User? _user;
   Map<String, dynamic>? _optimizedTimetableData; // Données de l'emploi du temps optimisé
   bool _isLoading = true; // État de chargement
 
-  final NotificationService _notificationService = NotificationService(flutterLocalNotificationsPlugin);
+  final NotificationService _notificationService = NotificationService();
 
 
-  @override
+  
   void initState() {
     super.initState();
     _user = FirebaseAuth.instance.currentUser;
     _loadOptimizedTimetable(); // Charger l'emploi du temps optimisé au démarrage
   }
+  void scheduleAllNotifications(Map<String, dynamic> timetable) {
+  int idCounter = 0;
 
+  timetable.forEach((day, activities) {
+    for (var activity in activities) {
+      final startTime = activity['startTime'];
+      final activityName = activity['activity'];
+
+      // Calculer la DateTime exacte
+      DateTime now = DateTime.now();
+      DateTime targetDay = _getNextWeekdayDate(day);
+      DateTime startDateTime = DateTime.parse("${targetDay.toString().split(' ')[0]} $startTime:00");
+
+      DateTime notificationTime = startDateTime.subtract(Duration(minutes: 2)); // Rappel 10 min avant
+
+      if (notificationTime.isAfter(now)) {
+        NotificationService.scheduleNotification(
+          id: idCounter++,
+          title: "📚 Bientôt : $activityName",
+          body: "Débute à $startTime",
+          scheduledTime: notificationTime,
+        );
+      }
+    }
+  });
+}
+DateTime _getNextWeekdayDate(String jour) {
+  Map<String, int> jours = {
+    'lundi': DateTime.monday,
+    'mardi': DateTime.tuesday,
+    'mercredi': DateTime.wednesday,
+    'jeudi': DateTime.thursday,
+    'vendredi': DateTime.friday,
+    'samedi': DateTime.saturday,
+    'dimanche': DateTime.sunday,
+  };
+
+  int today = DateTime.now().weekday;
+  int target = jours[jour.toLowerCase()] ?? DateTime.monday;
+
+  int delta = (target - today) % 7;
+  if (delta == 0) delta = 7;
+
+  return DateTime.now().add(Duration(days: delta));
+}
   // Charge l'emploi du temps optimisé depuis Firestore
   Future<void> _loadOptimizedTimetable() async {
     if (_user == null) {
@@ -45,17 +90,23 @@ class _OptimizedSchedulePageState extends State<OptimizedSchedulePage> {
           .get();
 
       if (doc.exists && doc.data() != null) {
-        setState(() {
-          _optimizedTimetableData = doc.data();
-          _isLoading = false;
-        });
-        print('Emploi du temps optimisé chargé avec succès.');
-      } else {
-        setState(() {
-          _isLoading = false;
-        });
-        print('Aucun emploi du temps optimisé trouvé pour l\'utilisateur ${_user!.uid}.');
-      }
+  final data = doc.data()!;
+
+  setState(() {
+    _optimizedTimetableData = data;
+    _isLoading = false;
+  });
+
+  // 🔔 Planifie toutes les notifications à 2 minutes avant chaque activité
+  scheduleAllNotifications(data);
+
+  print('Emploi du temps optimisé chargé avec succès.');
+} else {
+  setState(() {
+    _isLoading = false;
+  });
+  print('Aucun emploi du temps optimisé trouvé pour l\'utilisateur ${_user!.uid}.');
+}
     } catch (e) {
       print('Erreur lors du chargement de l\'emploi du temps optimisé: $e');
       setState(() {

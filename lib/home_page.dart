@@ -7,6 +7,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:lead/services/notification_service.dart'; // Importez votre service de notification
 import 'main.dart'; // Pour accéder à l'instance globale de flutterLocalNotificationsPlugin
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'services/notification_service.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -16,7 +19,7 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  int _currentIndex = 1; // Index de la page actuelle, par défaut sur Schedule (1)
+  int _currentIndex = 0; // Index de la page actuelle, par défaut sur Schedule (1)
   final List<Widget> _pages = [
     const AppsPage(),
     const TimetableSetupScreen(), // Page pour configurer l'emploi du temps
@@ -38,8 +41,8 @@ class _HomePageState extends State<HomePage> {
         backgroundColor: Colors.white,
         type: BottomNavigationBarType.fixed,
         items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.apps), label: 'Apps'),
-          BottomNavigationBarItem(icon: Icon(Icons.schedule), label: 'Schedule'),
+          BottomNavigationBarItem(icon: Icon(Icons.apps), label: 'Accueil'),
+          BottomNavigationBarItem(icon: Icon(Icons.schedule), label: 'Emploi du temps'),
           BottomNavigationBarItem(icon: Icon(Icons.notifications), label: 'Notifications'),
           BottomNavigationBarItem(icon: Icon(Icons.check_circle_outline), label: 'Optimisé'),
         ],
@@ -92,10 +95,19 @@ class _TimetableSetupScreenState extends State<TimetableSetupScreen> {
 
   // Chargement initial de l'emploi du temps
   @override
-  void initState() {
-    super.initState();
-    _loadInitialTimetable();
-  }
+void initState() {
+  super.initState();
+  setupNotifications();
+}
+
+void setupNotifications() async {
+  await Firebase.initializeApp();
+  await NotificationService.requestPermission();
+  await NotificationService.initialize();
+
+  final token = await NotificationService.getToken();
+  print("🔑 Token de l'appareil : $token");
+}
 
   // Charge le planning de l'utilisateur s'il existe déjà
   Future<void> _loadInitialTimetable() async {
@@ -652,7 +664,7 @@ class _TimetableViewScreenState extends State<TimetableViewScreen> {
   bool isLoading = true;
   bool isOptimized = false;
   // Instanciez votre service de notification ici
-  final NotificationService _notificationService = NotificationService(flutterLocalNotificationsPlugin);
+  final NotificationService _notificationService = NotificationService();
 
 
   @override

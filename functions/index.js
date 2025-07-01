@@ -331,6 +331,32 @@ IMPÉRATIF : Aucun caractère bizarre, aucune durée < 45min pour l'apprentissag
 
 FORMAT : JSON identique à l'input, avec tous les créneaux libres transformés en sessions d'excellence.`;
 }
+exports.sendNotification = functions.https.onCall(async (data, context) => {
+  const token = data.token;
+  const title = data.title || "📅 Planning optimisé disponible !";
+  const body = data.body || "Consulte ton planning avec les suggestions de l'IA.";
+
+  if (!token) {
+    throw new functions.https.HttpsError('invalid-argument', 'Token manquant.');
+  }
+
+  const message = {
+    notification: {
+      title: title,
+      body: body,
+    },
+    token: token,
+  };
+
+  try {
+    const response = await admin.messaging().send(message);
+    console.log("✅ Notification envoyée :", response);
+    return { success: true };
+  } catch (error) {
+    console.error("❌ Erreur d'envoi :", error);
+    throw new functions.https.HttpsError('internal', 'Erreur lors de l’envoi.');
+  }
+});
 
 function generateTimeSlots(startHour, endHour, intervalMinutes = 15) {
     const slots = [];
