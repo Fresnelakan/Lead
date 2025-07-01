@@ -1149,7 +1149,7 @@ class _TimetableViewScreenState extends State<TimetableViewScreen> {
         ),
         child: SingleChildScrollView(
           scrollDirection: Axis.horizontal,
-          child: Container(
+          child: SizedBox(
             width: MediaQuery.of(context).size.width * 1.8,
             child: Column(
               children: [
@@ -1191,7 +1191,7 @@ class _TimetableViewScreenState extends State<TimetableViewScreen> {
                             textAlign: TextAlign.center,
                           ),
                         ),
-                      )).toList(),
+                      )),
                     ],
                   ),
                 ),
@@ -1294,7 +1294,7 @@ class _TimetableViewScreenState extends State<TimetableViewScreen> {
                                     ),
                                   ),
                                 );
-                              }).toList(),
+                              }),
                             ],
                           ),
                         );
@@ -1315,8 +1315,8 @@ class _TimetableViewScreenState extends State<TimetableViewScreen> {
           );
         },
         backgroundColor: Colors.blue,
-        child: const Icon(Icons.edit, color: Colors.white),
         tooltip: "Modifier l'emploi du temps",
+        child: const Icon(Icons.edit, color: Colors.white),
       ),
     );
   }
