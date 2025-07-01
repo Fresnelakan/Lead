@@ -1,0 +1,5 @@
+Exporter : Avant d'arrêter les émulateurs : firebase emulators:export ./emulator-data (remplacez ./emulator-data par le chemin du dossier où vous voulez sauvegarder les données).
+Importer : Pour démarrer les émulateurs avec les données sauvegardées : firebase emulators:start --import ./emulator-data
+
+
+firebase emulators:export C:\Users\HP\Documents\data   
